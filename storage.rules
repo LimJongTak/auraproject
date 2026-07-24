@@ -1,0 +1,35 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isTeamMemberOf(exhibitionId) {
+      let ex = firestore.get(/databases/(default)/documents/exhibitions/$(exhibitionId)).data;
+      let profile = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return isSignedIn() && profile.teamId == ex.teamId;
+    }
+
+    match /exhibitions/{exhibitionId}/pages/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isTeamMemberOf(exhibitionId)
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|webp|png)');
+    }
+    match /exhibitions/{exhibitionId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isTeamMemberOf(exhibitionId)
+                   && fileName.matches('thumbnail[.].+')
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|webp|png)');
+    }
+    match /config/theme/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

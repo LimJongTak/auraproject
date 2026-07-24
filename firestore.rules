@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isAdmin() { return isSignedIn() && myProfile().role == 'admin'; }
+
+    // ---------------- users ----------------
+    match /users/{uid} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role == 'user';
+      allow update: if isSignedIn() && (
+                      (request.auth.uid == uid
+                       && request.resource.data.role == resource.data.role)
+                      || isAdmin()
+                    );
+      allow delete: if false;
+    }
+
+    // ---------------- teams (doc ID == invite code) ----------------
+    // Teams now belong to exactly one contest (categoryId). "At most one team
+    // per contest per user" is enforced by teamMemberships/{uid}_{categoryId}
+    // below, not here — a create/join only fully commits if the matching
+    // membership doc also validates in the same transaction.
+    match /teams/{teamId} {
+      function categoryTeamSizeMax(categoryId) {
+        let cat = get(/databases/$(database)/documents/categories/$(categoryId)).data;
+        return !('teamSizeMax' in cat) ? null : cat.teamSizeMax;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+                    && request.resource.data.leaderUid == request.auth.uid
+                    && request.resource.data.memberUids == [request.auth.uid]
+                    && request.resource.data.categoryId is string;
+      allow update: if isSignedIn() && (
+                      (request.resource.data.memberUids == resource.data.memberUids.concat([request.auth.uid])
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+                       && (categoryTeamSizeMax(resource.data.categoryId) == null
+                           || request.resource.data.memberUids.size() <= categoryTeamSizeMax(resource.data.categoryId)))
+                      || (request.resource.data.memberUids == resource.data.memberUids.removeAll([request.auth.uid])
+                          && resource.data.leaderUid != request.auth.uid
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids']))
+                      || isAdmin()
+                    );
+      allow delete: if (isSignedIn() && resource.data.leaderUid == request.auth.uid
+                         && resource.data.memberUids.size() == 1) || isAdmin();
+    }
+
+    // ---------------- team memberships (doc ID == `${uid}_${categoryId}`) ----------------
+    match /teamMemberships/{membershipId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && membershipId == request.auth.uid + '_' + request.resource.data.categoryId;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ---------------- categories ----------------
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------- per-category banner theme reveal ----------------
+    match /bannerThemes/{categoryId} {
+      // The reveal time itself lives on the (public) category doc, not here —
+      // only the theme content is gated. Public visitors only get it once
+      // Firestore's own server clock passes that time (client clock tampering
+      // can't bypass this). Admins can always read/preview regardless.
+      allow read: if isAdmin()
+        || request.time >= get(/databases/$(database)/documents/categories/$(categoryId)).data.themeRevealAt;
+      allow write: if isAdmin();
+    }
+
+    // ---------------- exhibitions ----------------
+    match /exhibitions/{exhibitionId} {
+      function isWithinSubmissionWindow(categoryId) {
+        let cat = get(/databases/$(database)/documents/categories/$(categoryId)).data;
+        return request.time >= cat.submissionOpenAt && request.time <= cat.submissionCloseAt;
+      }
+
+      // Teams are scoped to one contest each (see teams/{teamId}), so "is this
+      // caller on the team submitting/owning this exhibition" is just "does
+      // their membership for this exhibition's contest point at this team".
+      function myMembershipTeamId(categoryId) {
+        return get(/databases/$(database)/documents/teamMemberships/$(request.auth.uid + '_' + categoryId)).data.teamId;
+      }
+
+      // Defense in depth — the cap is already enforced when joining a team
+      // (see teams/{teamId} allow update), this just covers pre-existing teams.
+      function isTeamSizeAllowed(categoryId, teamId) {
+        let cat = get(/databases/$(database)/documents/categories/$(categoryId)).data;
+        let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
+        let size = team.memberUids.size();
+        let minOk = !('teamSizeMin' in cat) || size >= cat.teamSizeMin;
+        let maxOk = !('teamSizeMax' in cat) || cat.teamSizeMax == null || size <= cat.teamSizeMax;
+        return minOk && maxOk;
+      }
+
+      // Applies to both single-doc get() and list() queries. For list(), Firestore
+      // requires the query's own where()/orderBy() filters to make one whole branch
+      // provably true for every possible result — e.g. the public gallery query must
+      // filter where('status','==','published'); a team's own query filters
+      // where('teamId','==', myTeamId); admin queries (isAdmin() doesn't depend on
+      // resource.data) can be unfiltered. An unfiltered, non-admin query against this
+      // collection will be rejected outright rather than silently partially-filtered.
+      allow read: if resource.data.status == 'published'
+                 || isAdmin()
+                 || (isSignedIn() && myMembershipTeamId(resource.data.categoryId) == resource.data.teamId);
+
+      allow create: if isSignedIn()
+        && myMembershipTeamId(request.resource.data.categoryId) == request.resource.data.teamId
+        && request.resource.data.status == 'draft'
+        && request.resource.data.likeCount == 0
+        && request.resource.data.commentCount == 0
+        && isWithinSubmissionWindow(request.resource.data.categoryId)
+        && isTeamSizeAllowed(request.resource.data.categoryId, request.resource.data.teamId);
+
+      allow update: if isSignedIn() && (
+          (myMembershipTeamId(resource.data.categoryId) == resource.data.teamId
+           && resource.data.status == 'draft'
+           && request.resource.data.status == 'published'
+           && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'pageImageUrls', 'pageCount', 'thumbnailUrl', 'updatedAt']))
+          || (myMembershipTeamId(resource.data.categoryId) == resource.data.teamId
+              && request.resource.data.likeCount == resource.data.likeCount
+              && request.resource.data.commentCount == resource.data.commentCount
+              && request.resource.data.teamId == resource.data.teamId
+              && request.resource.data.status == resource.data.status)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+              && (request.resource.data.likeCount == resource.data.likeCount + 1
+                  || request.resource.data.likeCount == resource.data.likeCount - 1))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount'])
+              && (request.resource.data.commentCount == resource.data.commentCount + 1
+                  || request.resource.data.commentCount == resource.data.commentCount - 1))
+          || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAdmin()
+        || (isSignedIn() && myMembershipTeamId(resource.data.categoryId) == resource.data.teamId);
+
+      match /likes/{uid} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && request.auth.uid == uid;
+      }
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isSignedIn()
+          && (resource.data.authorUid == request.auth.uid || isAdmin());
+      }
+    }
+  }
+}
