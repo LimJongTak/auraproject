@@ -18,13 +18,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://scnuai.com"),
-  title: "AI인재양성부트캠프사업단",
-  description: "학생 창업경진대회 온라인전시관",
+  title: "국립순천대학교 AI인재양성부트캠프사업단",
+  description: "국립순천대학교 AI인재양성부트캠프사업단",
   openGraph: {
-    title: "AI인재양성부트캠프사업단",
-    description: "학생 창업경진대회 온라인전시관",
+    title: "국립순천대학교 AI인재양성부트캠프사업단",
+    description: "국립순천대학교 AI인재양성부트캠프사업단",
     url: "https://scnuai.com",
-    siteName: "AI인재양성부트캠프사업단",
+    siteName: "국립순천대학교 AI인재양성부트캠프사업단",
     locale: "ko_KR",
     type: "website",
   },
