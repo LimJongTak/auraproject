@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { CalendarClock, ClipboardList, LayoutGrid, Megaphone, MessageSquare, ShieldCheck, Users2 } from "lucide-react";
+import {
+  BarChart3,
+  CalendarClock,
+  ClipboardList,
+  LayoutGrid,
+  Megaphone,
+  MessageSquare,
+  ShieldCheck,
+  Users2,
+} from "lucide-react";
 import { RequireAdmin } from "@/components/auth/Guard";
 
 const CARDS = [
@@ -20,6 +29,12 @@ const CARDS = [
   { href: "/admin/notices", title: "공지사항 관리", desc: "학생들에게 보여줄 공지사항을 작성·관리해요", icon: Megaphone },
   { href: "/admin/inquiries", title: "문의 관리", desc: "학생 문의를 확인하고 답변을 남겨요", icon: MessageSquare },
   { href: "/admin/users", title: "사용자 관리", desc: "관리자 권한을 부여하거나 해제해요", icon: Users2 },
+  {
+    href: "/admin/analytics",
+    title: "방문자 통계",
+    desc: "일간·주간·월간·년간 방문자 수를 확인하고 엑셀로 내려받아요",
+    icon: BarChart3,
+  },
 ];
 
 export default function AdminHomePage() {

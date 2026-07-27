@@ -70,6 +70,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------------- visit stats (anonymous visitor counter) ----------------
+    // One doc per calendar day, doc ID == date. Anyone visiting the site can
+    // bump today's count by exactly 1; only admins can read the aggregated
+    // history (via the analytics dashboard).
+    match /visitStats/{date} {
+      allow get, list: if isAdmin();
+      allow create: if request.resource.data.count == 1
+                    && request.resource.data.keys().hasOnly(['count', 'updatedAt']);
+      allow update: if request.resource.data.count == resource.data.count + 1
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'updatedAt']);
+      allow delete: if false;
+    }
+
     // ---------------- announcements ----------------
     match /announcements/{announcementId} {
       allow read: if true;

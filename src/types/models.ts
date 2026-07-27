@@ -138,3 +138,11 @@ export interface Inquiry {
   answeredBy: string | null;
   createdAt: Timestamp;
 }
+
+// Doc ID == date ("YYYY-MM-DD", local time of the visiting browser).
+// One doc per calendar day, count incremented once per browser session.
+export interface VisitStat {
+  date: string;
+  count: number;
+  updatedAt: Timestamp;
+}

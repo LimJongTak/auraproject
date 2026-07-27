@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 import { Header } from "@/components/layout/Header";
 import { FirebaseConfigGate } from "@/components/layout/FirebaseConfigGate";
+import { VisitTracker } from "@/components/layout/VisitTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://scnuai.com"),
   title: "AI인재양성부트캠프사업단",
   description: "학생 창업경진대회 온라인전시관",
+  openGraph: {
+    title: "AI인재양성부트캠프사업단",
+    description: "학생 창업경진대회 온라인전시관",
+    url: "https://scnuai.com",
+    siteName: "AI인재양성부트캠프사업단",
+    locale: "ko_KR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -33,6 +43,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <FirebaseConfigGate>
           <AuthProvider>
+            <VisitTracker />
             <Header />
             <main className="flex-1">{children}</main>
           </AuthProvider>
