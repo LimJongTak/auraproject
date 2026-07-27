@@ -38,11 +38,17 @@ export interface Category {
   id: string;
   name: string;
   description: string | null;
+  // Longer free-text body for the contest detail page (/contest/[id]),
+  // separate from the short `description` used in listings/banners.
+  detailContent: string | null;
   order: number;
   isActive: boolean;
   submissionOpenAt: Timestamp;
   submissionCloseAt: Timestamp;
   bannerImageUrl: string | null;
+  // Shown as the card preview image on the /contest list page — distinct from
+  // bannerImageUrl, which is the large hero image on the home page banner.
+  thumbnailUrl: string | null;
   teamSizeMin: number;
   teamSizeMax: number | null;
   // Public on purpose (unlike the theme content below): visitors need it to
@@ -107,3 +113,28 @@ export interface BannerTheme {
 }
 
 export type SortOption = "popular" | "latest";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  imageUrl: string | null;
+  authorUid: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export type InquiryStatus = "pending" | "answered";
+
+export interface Inquiry {
+  id: string;
+  uid: string;
+  authorName: string;
+  title: string;
+  content: string;
+  status: InquiryStatus;
+  answer: string | null;
+  answeredAt: Timestamp | null;
+  answeredBy: string | null;
+  createdAt: Timestamp;
+}

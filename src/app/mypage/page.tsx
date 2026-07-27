@@ -2,18 +2,33 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { User, Heart, MessageCircle, Plus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { User, Heart, MessageCircle, Plus, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
 import { getTeam, subscribeMyMemberships } from "@/lib/firestore/teams";
-import type { Exhibition, ExhibitionStatus, Team, TeamMembership } from "@/types/models";
-import { Badge, CenteredSpinner } from "@/components/ui/misc";
+import { subscribeMyInquiries } from "@/lib/firestore/inquiries";
+import { changePassword } from "@/lib/auth/changePassword";
+import { toKoreanAuthError } from "@/lib/firebase/errors";
+import { changePasswordSchema, type ChangePasswordFormValues } from "@/lib/validation/authSchemas";
+import type { Exhibition, ExhibitionStatus, Inquiry, Team, TeamMembership } from "@/types/models";
+import { Badge, CenteredSpinner, ErrorText } from "@/components/ui/misc";
+import { Input } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import type { User as FirebaseUser } from "firebase/auth";
+import { cn } from "@/lib/utils/cn";
 
 const STATUS_LABEL: Record<ExhibitionStatus, string> = {
   draft: "임시저장",
   published: "게시중",
   hidden: "숨김",
+};
+
+const INQUIRY_STATUS_LABEL: Record<Inquiry["status"], { label: string; className: string }> = {
+  pending: { label: "대기중", className: "bg-surface text-muted" },
+  answered: { label: "답변완료", className: "bg-primary-light text-primary-dark" },
 };
 
 export default function MyPage() {
@@ -25,14 +40,21 @@ export default function MyPage() {
 }
 
 function MyPageContent() {
-  const { profile } = useAuth();
+  const { firebaseUser, profile } = useAuth();
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
+  const [inquiries, setInquiries] = useState<Inquiry[] | null>(null);
 
   useEffect(() => {
     if (!profile?.uid) return;
     const unsub = subscribeMyMemberships(profile.uid, setMemberships);
+    return () => unsub();
+  }, [profile?.uid]);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const unsub = subscribeMyInquiries(profile.uid, setInquiries);
     return () => unsub();
   }, [profile?.uid]);
 
@@ -133,6 +155,98 @@ function MyPageContent() {
           </ul>
         )}
       </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold">내 문의</h2>
+          <Link href="/inquiries" className="flex items-center gap-1 text-sm font-semibold text-primary">
+            문의하러 가기 <ArrowRight size={14} />
+          </Link>
+        </div>
+        {inquiries === null ? (
+          <p className="mt-3 text-sm text-muted">불러오는 중...</p>
+        ) : inquiries.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">아직 남긴 문의가 없어요.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-2">
+            {inquiries.slice(0, 3).map((q) => (
+              <li key={q.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2.5 text-sm">
+                <span className="truncate font-medium">{q.title}</span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                    INQUIRY_STATUS_LABEL[q.status].className
+                  )}
+                >
+                  {INQUIRY_STATUS_LABEL[q.status].label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {firebaseUser && <PasswordChangeCard firebaseUser={firebaseUser} />}
+    </div>
+  );
+}
+
+function PasswordChangeCard({ firebaseUser }: { firebaseUser: FirebaseUser }) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordFormValues>({ resolver: zodResolver(changePasswordSchema) });
+
+  async function onSubmit(values: ChangePasswordFormValues) {
+    setSubmitError(null);
+    setSuccess(false);
+    try {
+      await changePassword(firebaseUser, values.currentPassword, values.newPassword);
+      reset();
+      setSuccess(true);
+    } catch (error) {
+      setSubmitError(toKoreanAuthError(error));
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-white p-6">
+      <h2 className="font-bold">비밀번호 변경</h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-4">
+        <Input
+          label="현재 비밀번호"
+          type="password"
+          {...register("currentPassword")}
+          error={errors.currentPassword?.message}
+        />
+        <Input
+          label="새 비밀번호"
+          type="password"
+          {...register("newPassword")}
+          error={errors.newPassword?.message}
+        />
+        <Input
+          label="새 비밀번호 확인"
+          type="password"
+          {...register("newPasswordConfirm")}
+          error={errors.newPasswordConfirm?.message}
+        />
+
+        {submitError && <ErrorText>{submitError}</ErrorText>}
+        {success && (
+          <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
+            비밀번호가 변경됐어요.
+          </p>
+        )}
+
+        <Button type="submit" loading={isSubmitting} className="self-start">
+          비밀번호 변경
+        </Button>
+      </form>
     </div>
   );
 }

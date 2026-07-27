@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -22,28 +23,38 @@ export function subscribeCategories(cb: (categories: Category[]) => void) {
   });
 }
 
+export async function getCategory(id: string): Promise<Category | null> {
+  const snap = await getDoc(doc(db, "categories", id));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Category) : null;
+}
+
 export interface CategoryInput {
   name: string;
   description: string | null;
+  detailContent: string | null;
   order: number;
   isActive: boolean;
   submissionOpenAt: Date;
   submissionCloseAt: Date;
   teamSizeMin: number;
   teamSizeMax: number | null;
+  bannerImageUrl: string | null;
+  thumbnailUrl: string | null;
 }
 
 export async function createCategory(input: CategoryInput) {
   await addDoc(categoriesRef(), {
     name: input.name,
     description: input.description,
+    detailContent: input.detailContent,
     order: input.order,
     isActive: input.isActive,
     submissionOpenAt: Timestamp.fromDate(input.submissionOpenAt),
     submissionCloseAt: Timestamp.fromDate(input.submissionCloseAt),
     teamSizeMin: input.teamSizeMin,
     teamSizeMax: input.teamSizeMax,
-    bannerImageUrl: null,
+    bannerImageUrl: input.bannerImageUrl,
+    thumbnailUrl: input.thumbnailUrl,
     themeRevealAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -54,12 +65,15 @@ export async function updateCategory(id: string, input: CategoryInput) {
   await updateDoc(doc(db, "categories", id), {
     name: input.name,
     description: input.description,
+    detailContent: input.detailContent,
     order: input.order,
     isActive: input.isActive,
     submissionOpenAt: Timestamp.fromDate(input.submissionOpenAt),
     submissionCloseAt: Timestamp.fromDate(input.submissionCloseAt),
     teamSizeMin: input.teamSizeMin,
     teamSizeMax: input.teamSizeMax,
+    bannerImageUrl: input.bannerImageUrl,
+    thumbnailUrl: input.thumbnailUrl,
     updatedAt: serverTimestamp(),
   });
 }

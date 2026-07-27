@@ -62,7 +62,7 @@ export default function ExhibitionsPage() {
           onChange={(e) => setCategoryId(e.target.value)}
           className="w-auto min-w-[10rem]"
         >
-          <option value="">전체 카테고리</option>
+          <option value="">전체</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

@@ -123,6 +123,7 @@ function BannerCard({ category, uid }: { category: Category; uid: string }) {
       <div className="mt-4 flex flex-col gap-2">
         <span className="text-sm font-semibold">배너 이미지</span>
         <input type="file" accept="image/*" onChange={handleBannerImageChange} />
+        <span className="text-xs text-muted">JPG, PNG, WebP 등 이미지 파일 (최대 5MB) · 권장 규격 1600×600px (가로형)</span>
         {uploadingBanner && <span className="text-xs text-muted">업로드 중...</span>}
         {bannerImageUrl && (
           <div className="mt-1 flex items-center gap-3">
@@ -241,6 +242,7 @@ function ThemeRevealForm({
       <div className="flex flex-col gap-2">
         <span className="text-sm font-semibold">주제 이미지 (선택)</span>
         <input type="file" accept="image/*" onChange={handleImageChange} />
+        <span className="text-xs text-muted">JPG, PNG, WebP 등 이미지 파일 (최대 5MB) · 권장 규격 600×400px</span>
         {uploading && <span className="text-xs text-muted">업로드 중...</span>}
         {imageUrl && (
           <div className="mt-1 flex items-center gap-3">

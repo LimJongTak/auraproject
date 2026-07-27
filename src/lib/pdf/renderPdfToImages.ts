@@ -8,7 +8,7 @@ async function loadPdfjs() {
 }
 
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;
-export const MAX_PDF_PAGES = 60;
+export const MAX_PDF_PAGES = 30;
 const PAGE_RENDER_SCALE = 2; // ~144 DPI
 const MAX_SIDE_PX = 2000;
 const THUMBNAIL_SCALE = 0.55;

@@ -6,6 +6,8 @@ const MESSAGES: Record<string, string> = {
   "auth/wrong-password": "비밀번호가 올바르지 않아요",
   "auth/invalid-credential": "이메일 또는 비밀번호가 올바르지 않아요",
   "auth/too-many-requests": "잠시 후 다시 시도해주세요",
+  "auth/expired-action-code": "링크가 만료됐어요. 비밀번호 찾기를 다시 시도해주세요",
+  "auth/invalid-action-code": "이미 사용됐거나 올바르지 않은 링크예요. 비밀번호 찾기를 다시 시도해주세요",
 };
 
 export function toKoreanAuthError(error: unknown): string {

@@ -117,10 +117,6 @@ function NewExhibitionForm() {
       setError("이 대회에 참가한 팀이 없어요. 먼저 팀을 구성해주세요.");
       return;
     }
-    if (!file) {
-      setFileError("PDF 파일을 업로드해주세요");
-      return;
-    }
     const category = categories.find((c) => c.id === values.categoryId);
     if (!category) {
       setError("카테고리를 다시 선택해주세요");
@@ -164,15 +160,22 @@ function NewExhibitionForm() {
         submittedByUid: profile!.uid,
       });
 
-      setPhase("rendering");
-      const { pages, thumbnail } = await renderPdfToImages(file, (p) => {
-        setProgress({ label: `PDF 변환 중 (${p.currentPage}/${p.totalPages}페이지)`, percent: (p.currentPage / p.totalPages) * 100 });
-      });
+      let pageImageUrls: string[] = [];
+      let thumbnailUrl: string | null = null;
 
-      setPhase("uploading");
-      const { pageImageUrls, thumbnailUrl } = await uploadExhibitionPages(exhibitionId, pages, thumbnail, (p) => {
-        setProgress({ label: "이미지 업로드 중", percent: (p.bytesTransferred / p.totalBytes) * 100 });
-      });
+      if (file) {
+        setPhase("rendering");
+        const { pages, thumbnail } = await renderPdfToImages(file, (p) => {
+          setProgress({ label: `PDF 변환 중 (${p.currentPage}/${p.totalPages}페이지)`, percent: (p.currentPage / p.totalPages) * 100 });
+        });
+
+        setPhase("uploading");
+        const uploaded = await uploadExhibitionPages(exhibitionId, pages, thumbnail, (p) => {
+          setProgress({ label: "이미지 업로드 중", percent: (p.bytesTransferred / p.totalBytes) * 100 });
+        });
+        pageImageUrls = uploaded.pageImageUrls;
+        thumbnailUrl = uploaded.thumbnailUrl;
+      }
 
       setPhase("publishing");
       await publishExhibitionPages(exhibitionId, {
@@ -244,7 +247,7 @@ function NewExhibitionForm() {
         <LinkPreviewHelp />
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-semibold">발표자료 PDF</span>
+          <span className="text-sm font-semibold">발표자료 PDF (선택)</span>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface px-4 py-8 text-center transition hover:border-primary">
             <input type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
             {file ? (

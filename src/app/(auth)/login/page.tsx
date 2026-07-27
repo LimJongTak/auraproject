@@ -53,6 +53,9 @@ export default function LoginPage() {
           {...register("password")}
           error={errors.password?.message}
         />
+        <Link href="/forgot-password" className="-mt-2 self-end text-xs font-semibold text-primary">
+          비밀번호를 잊으셨나요?
+        </Link>
 
         {submitError && <ErrorText>{submitError}</ErrorText>}
 

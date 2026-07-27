@@ -47,6 +47,14 @@ export default function ContestPage() {
             return (
               <div key={c.id} className="flex flex-col justify-between rounded-2xl border border-border bg-white p-6">
                 <div>
+                  {c.thumbnailUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.thumbnailUrl}
+                      alt={c.name}
+                      className="mb-4 h-36 w-full rounded-xl object-cover"
+                    />
+                  )}
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-bold">{c.name}</h3>
                     <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
@@ -56,11 +64,18 @@ export default function ContestPage() {
                   {c.description && <p className="mt-2 text-sm text-muted">{c.description}</p>}
                   <p className="mt-2 text-xs text-muted">{formatDateRange(c.submissionOpenAt, c.submissionCloseAt)}</p>
                 </div>
-                <Link href="/exhibitions" className="mt-6">
-                  <Button variant="outline" className="w-full">
-                    전시물 보러가기 <ArrowRight size={14} />
-                  </Button>
-                </Link>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                  <Link href={`/contest/${c.id}`} className="flex-1">
+                    <Button className="w-full">
+                      자세히 보기 <ArrowRight size={14} />
+                    </Button>
+                  </Link>
+                  <Link href="/exhibitions" className="flex-1">
+                    <Button variant="outline" className="w-full">
+                      전시물 보러가기
+                    </Button>
+                  </Link>
+                </div>
               </div>
             );
           })}

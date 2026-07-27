@@ -70,6 +70,28 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------------- announcements ----------------
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------- inquiries (student -> admin) ----------------
+    match /inquiries/{inquiryId} {
+      allow get: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      // Non-admin queries must filter where('uid','==', myUid) themselves —
+      // same "provably true per result" pattern as exhibitions below.
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.answer == null;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'answer', 'answeredAt', 'answeredBy'])
+        && request.resource.data.status == 'answered';
+      allow delete: if isAdmin();
+    }
+
     // ---------------- per-category banner theme reveal ----------------
     match /bannerThemes/{categoryId} {
       // The reveal time itself lives on the (public) category doc, not here —
