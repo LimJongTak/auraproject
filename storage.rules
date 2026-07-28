@@ -6,10 +6,13 @@ service firebase.storage {
       return isSignedIn() &&
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+    // Team membership isn't stored on the user profile — it lives in
+    // teamMemberships/{uid}_{categoryId}, one doc per contest a user has
+    // joined (mirrors myMembershipTeamId() in firestore.rules).
     function isTeamMemberOf(exhibitionId) {
       let ex = firestore.get(/databases/(default)/documents/exhibitions/$(exhibitionId)).data;
-      let profile = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      return isSignedIn() && profile.teamId == ex.teamId;
+      let membership = firestore.get(/databases/(default)/documents/teamMemberships/$(request.auth.uid + '_' + ex.categoryId)).data;
+      return isSignedIn() && membership.teamId == ex.teamId;
     }
 
     match /exhibitions/{exhibitionId}/pages/{fileName} {
