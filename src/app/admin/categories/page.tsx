@@ -7,7 +7,8 @@ import { subscribeCategories, createCategory, updateCategory, deleteCategory, ty
 import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
 import { insertAtCursor } from "@/lib/utils/insertAtCursor";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
-import type { Category } from "@/types/models";
+import { DEFAULT_RUBRIC } from "@/lib/constants/defaultRubric";
+import type { Category, RubricItem } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Breadcrumb, ErrorText } from "@/components/ui/misc";
@@ -136,6 +137,8 @@ function CategoryForm({
   );
   const [teamSizeMin, setTeamSizeMin] = useState(String(initial?.teamSizeMin ?? 1));
   const [teamSizeMax, setTeamSizeMax] = useState(initial?.teamSizeMax != null ? String(initial.teamSizeMax) : "");
+  const [baseMileage, setBaseMileage] = useState(String(initial?.baseMileage ?? 0));
+  const [rubric, setRubric] = useState<RubricItem[]>(initial?.rubric ?? []);
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(initial?.bannerImageUrl ?? null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initial?.thumbnailUrl ?? null);
@@ -143,6 +146,26 @@ function CategoryForm({
   const detailContentRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function addRubricItem() {
+    setRubric((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), group: "", label: "", criteria: "", maxScore: 10 },
+    ]);
+  }
+
+  function updateRubricItem(id: string, patch: Partial<RubricItem>) {
+    setRubric((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function removeRubricItem(id: string) {
+    setRubric((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  function loadDefaultRubric() {
+    if (rubric.length > 0 && !confirm("현재 문항을 기본 10문항으로 교체할까요?")) return;
+    setRubric(DEFAULT_RUBRIC.map((r) => ({ ...r })));
+  }
 
   async function handleBannerImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -187,6 +210,10 @@ function CategoryForm({
       setError("최대 인원은 최소 인원보다 크거나 같아야 해요");
       return;
     }
+    if (rubric.some((r) => !r.label.trim() || r.maxScore <= 0)) {
+      setError("평가표 문항은 세부 항목과 배점(1점 이상)을 모두 입력해야 해요");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const input: CategoryInput = {
@@ -201,6 +228,8 @@ function CategoryForm({
       teamSizeMax: max,
       bannerImageUrl,
       thumbnailUrl,
+      baseMileage: Math.max(0, parseInt(baseMileage, 10) || 0),
+      rubric: rubric.map((r) => ({ ...r, label: r.label.trim(), criteria: r.criteria.trim(), group: r.group.trim() })),
     };
     try {
       if (initial) {
@@ -268,6 +297,79 @@ function CategoryForm({
         />
       </div>
       <p className="-mt-2 text-xs text-muted">1인 대회는 최소/최대 모두 1로 설정하세요.</p>
+
+      <Input
+        label="기본 지급 마일리지 (참가자 안내용 숫자, 대회 공고에 표시돼요)"
+        type="number"
+        min={0}
+        value={baseMileage}
+        onChange={(e) => setBaseMileage(e.target.value)}
+      />
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold">평가표 (심사위원이 작품을 채점할 문항)</span>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={loadDefaultRubric}>
+              기본 10문항 불러오기
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={addRubricItem}>
+              <Plus size={14} /> 문항 추가
+            </Button>
+          </div>
+        </div>
+
+        {rubric.length === 0 ? (
+          <p className="text-xs text-muted">아직 문항이 없어요. 기본 10문항을 불러오거나 직접 추가하세요.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {rubric.map((r) => (
+              <li key={r.id} className="flex flex-col gap-2 rounded-xl border border-border bg-white p-3">
+                <div className="flex items-start gap-2">
+                  <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3">
+                    <Input
+                      placeholder="항목 (예: 독창성)"
+                      value={r.group}
+                      onChange={(e) => updateRubricItem(r.id, { group: e.target.value })}
+                    />
+                    <Input
+                      placeholder="세부 항목 (예: 문제 정의)"
+                      value={r.label}
+                      onChange={(e) => updateRubricItem(r.id, { label: e.target.value })}
+                    />
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="배점"
+                      value={r.maxScore}
+                      onChange={(e) => updateRubricItem(r.id, { maxScore: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeRubricItem(r.id)}
+                    className="mt-2.5 shrink-0 text-muted hover:text-red-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <Textarea
+                  placeholder="심사 기준"
+                  value={r.criteria}
+                  onChange={(e) => updateRubricItem(r.id, { criteria: e.target.value })}
+                  className="min-h-16"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        {rubric.length > 0 && (
+          <p className="text-right text-xs font-semibold text-muted">
+            합계 {rubric.reduce((sum, r) => sum + r.maxScore, 0)}점
+          </p>
+        )}
+      </div>
+
       <div className="flex flex-col gap-2">
         <span className="text-sm font-semibold">배너 이미지 (선택, 등록하면 메인 화면 상단에 노출)</span>
         <input type="file" accept="image/*" onChange={handleBannerImageChange} />

@@ -32,6 +32,7 @@ export function Header() {
   const mobileLinks = [
     ...NAV_LINKS,
     ...(firebaseUser ? [{ href: "/mypage", label: "마이페이지" }, { href: "/inquiries", label: "문의하기" }] : []),
+    ...(profile?.role === "admin" || profile?.role === "judge" ? [{ href: "/judge", label: "평가" }] : []),
     ...(profile?.role === "admin" ? [{ href: "/admin", label: "관리자" }] : []),
   ];
 
@@ -121,6 +122,15 @@ export function Header() {
               className="group relative py-2 text-lg font-bold text-foreground/80 transition hover:text-primary"
             >
               문의하기
+              <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-primary transition-all duration-300 group-hover:w-full" />
+            </Link>
+          )}
+          {(profile?.role === "admin" || profile?.role === "judge") && (
+            <Link
+              href="/judge"
+              className="group relative py-2 text-lg font-bold text-foreground/80 transition hover:text-primary"
+            >
+              평가
               <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-primary transition-all duration-300 group-hover:w-full" />
             </Link>
           )}

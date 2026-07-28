@@ -7,6 +7,9 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function isAdmin() { return isSignedIn() && myProfile().role == 'admin'; }
+    function isJudgeOrAdmin() {
+      return isSignedIn() && (myProfile().role == 'admin' || myProfile().role == 'judge');
+    }
 
     // ---------------- users ----------------
     match /users/{uid} {
@@ -178,6 +181,7 @@ service cloud.firestore {
               && (request.resource.data.commentCount == resource.data.commentCount + 1
                   || request.resource.data.commentCount == resource.data.commentCount - 1))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+          || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['award']))
       );
       allow delete: if isAdmin()
         || (isSignedIn() && myMembershipTeamId(resource.data.categoryId) == resource.data.teamId);
@@ -193,6 +197,21 @@ service cloud.firestore {
         allow delete: if isSignedIn()
           && (resource.data.authorUid == request.auth.uid || isAdmin());
       }
+    }
+
+    // ---------------- evaluations (doc ID == `${judgeUid}_${exhibitionId}`) ----------------
+    // Judges and admins only — students must never be able to read scores.
+    match /evaluations/{evalId} {
+      allow get, list: if isJudgeOrAdmin();
+      allow create: if isJudgeOrAdmin()
+        && request.resource.data.judgeUid == request.auth.uid
+        && evalId == request.auth.uid + '_' + request.resource.data.exhibitionId;
+      allow update: if isJudgeOrAdmin()
+        && resource.data.judgeUid == request.auth.uid
+        && request.resource.data.judgeUid == resource.data.judgeUid
+        && request.resource.data.exhibitionId == resource.data.exhibitionId
+        && request.resource.data.categoryId == resource.data.categoryId;
+      allow delete: if isAdmin();
     }
   }
 }

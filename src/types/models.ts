@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "judge";
 
 export interface UserProfile {
   uid: string;
@@ -54,8 +54,22 @@ export interface Category {
   // Public on purpose (unlike the theme content below): visitors need it to
   // render a "reveal in" countdown before the theme itself is readable.
   themeRevealAt: Timestamp | null;
+  // Informational only — shown on the contest announcement page. There is no
+  // mileage ledger/wallet system; this does not actually credit anyone.
+  baseMileage: number;
+  // Judging rubric, written by the admin when opening the contest. Items are
+  // scored individually by judges — see Evaluation below.
+  rubric: RubricItem[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface RubricItem {
+  id: string;
+  group: string; // e.g. 독창성/사업성/전달력
+  label: string; // 세부 항목
+  criteria: string; // 심사 기준
+  maxScore: number;
 }
 
 export interface LinkPreviewData {
@@ -87,6 +101,9 @@ export interface Exhibition {
   commentCount: number;
   status: ExhibitionStatus;
   submittedByUid: string;
+  // Set by an admin after judging closes. Shown on MyPage and wherever the
+  // exhibition itself is already publicly visible.
+  award: { label: string; rank: number } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -113,6 +130,21 @@ export interface BannerTheme {
 }
 
 export type SortOption = "popular" | "latest";
+
+// Doc ID: `${judgeUid}_${exhibitionId}` — at most one evaluation per judge
+// per submission, enforced in firestore.rules.
+export interface Evaluation {
+  id: string;
+  exhibitionId: string;
+  categoryId: string;
+  judgeUid: string;
+  judgeName: string;
+  scores: Record<string, number>; // RubricItem.id -> score
+  totalScore: number;
+  comment: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
 
 export interface Announcement {
   id: string;

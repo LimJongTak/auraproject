@@ -12,7 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Category } from "@/types/models";
+import type { Category, RubricItem } from "@/types/models";
 
 const categoriesRef = () => collection(db, "categories");
 
@@ -40,6 +40,8 @@ export interface CategoryInput {
   teamSizeMax: number | null;
   bannerImageUrl: string | null;
   thumbnailUrl: string | null;
+  baseMileage: number;
+  rubric: RubricItem[];
 }
 
 export async function createCategory(input: CategoryInput) {
@@ -55,6 +57,8 @@ export async function createCategory(input: CategoryInput) {
     teamSizeMax: input.teamSizeMax,
     bannerImageUrl: input.bannerImageUrl,
     thumbnailUrl: input.thumbnailUrl,
+    baseMileage: input.baseMileage,
+    rubric: input.rubric,
     themeRevealAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -74,6 +78,8 @@ export async function updateCategory(id: string, input: CategoryInput) {
     teamSizeMax: input.teamSizeMax,
     bannerImageUrl: input.bannerImageUrl,
     thumbnailUrl: input.thumbnailUrl,
+    baseMileage: input.baseMileage,
+    rubric: input.rubric,
     updatedAt: serverTimestamp(),
   });
 }

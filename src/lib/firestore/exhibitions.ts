@@ -48,6 +48,7 @@ export async function createDraftExhibition(input: NewExhibitionInput): Promise<
     commentCount: 0,
     status: "draft" as ExhibitionStatus,
     submittedByUid: input.submittedByUid,
+    award: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -86,6 +87,13 @@ export async function updateExhibitionMeta(
 
 export async function setExhibitionStatus(id: string, status: ExhibitionStatus) {
   await updateDoc(doc(db, "exhibitions", id), { status });
+}
+
+export async function setExhibitionAward(
+  id: string,
+  award: { label: string; rank: number } | null
+): Promise<void> {
+  await updateDoc(doc(db, "exhibitions", id), { award });
 }
 
 export async function deleteExhibition(id: string): Promise<void> {

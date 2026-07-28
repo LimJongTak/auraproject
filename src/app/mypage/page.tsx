@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Heart, MessageCircle, Plus, ArrowRight } from "lucide-react";
+import { User, Heart, MessageCircle, Plus, ArrowRight, Trophy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
@@ -138,6 +138,11 @@ function MyPageContent() {
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge>{e.categoryName}</Badge>
                     <span className="text-xs text-muted">{STATUS_LABEL[e.status]}</span>
+                    {e.award && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        <Trophy size={12} /> {e.award.label}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {e.status === "published" && (

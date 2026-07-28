@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { getCategory } from "@/lib/firestore/categories";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
+import { useCountdownTimer } from "@/hooks/useCountdown";
 import type { Category } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +32,10 @@ export default function ContestDetailPage() {
     getCategory(params.id).then(setCategory);
   }, [params.id]);
 
+  const state = category ? getSubmissionWindowState(category.submissionOpenAt, category.submissionCloseAt) : null;
+  const countdownTarget = state === "open" && category ? category.submissionCloseAt.toDate() : null;
+  const countdown = useCountdownTimer(countdownTarget);
+
   if (category === undefined) return <CenteredSpinner />;
   if (category === null) {
     return (
@@ -40,7 +45,7 @@ export default function ContestDetailPage() {
     );
   }
 
-  const state = getSubmissionWindowState(category.submissionOpenAt, category.submissionCloseAt);
+  const windowState = state!;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -57,13 +62,19 @@ export default function ContestDetailPage() {
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <h1 className="text-3xl font-extrabold">{category.name}</h1>
-        <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", STATE_LABEL[state].className)}>
-          {STATE_LABEL[state].label}
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", STATE_LABEL[windowState].className)}>
+          {STATE_LABEL[windowState].label}
         </span>
       </div>
+      {windowState === "open" && countdown && !countdown.done && (
+        <p className="mt-2 text-sm font-semibold text-primary">
+          마감까지 {countdown.days}일 {String(countdown.hours).padStart(2, "0")}:
+          {String(countdown.minutes).padStart(2, "0")}:{String(countdown.seconds).padStart(2, "0")}
+        </p>
+      )}
       {category.description && <p className="mt-2 text-foreground/80">{category.description}</p>}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface p-5 text-sm">
+      <div className="mt-6 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface p-5 text-sm sm:grid-cols-3">
         <div>
           <p className="text-xs text-muted">접수 기간</p>
           <p className="mt-0.5 font-medium">{formatDateRange(category.submissionOpenAt, category.submissionCloseAt)}</p>
@@ -71,6 +82,10 @@ export default function ContestDetailPage() {
         <div>
           <p className="text-xs text-muted">팀 인원</p>
           <p className="mt-0.5 font-medium">{formatTeamSize(category.teamSizeMin, category.teamSizeMax)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">기본 지급 마일리지</p>
+          <p className="mt-0.5 font-medium">{category.baseMileage ?? 0}점</p>
         </div>
       </div>
 
@@ -82,13 +97,13 @@ export default function ContestDetailPage() {
       )}
 
       <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-        {state === "open" ? (
+        {windowState === "open" ? (
           <Link href={`/exhibitions/new?categoryId=${category.id}`} className="flex-1">
             <Button className="w-full">신청하기</Button>
           </Link>
         ) : (
           <Button className="flex-1" disabled>
-            {STATE_LABEL[state].label}
+            {STATE_LABEL[windowState].label}
           </Button>
         )}
         <Link href="/exhibitions" className="flex-1">
