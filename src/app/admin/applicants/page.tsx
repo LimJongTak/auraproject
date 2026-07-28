@@ -7,7 +7,7 @@ import { subscribeCategories } from "@/lib/firestore/categories";
 import { listAllExhibitionsForAdmin } from "@/lib/firestore/exhibitions";
 import { listAllTeamsForAdmin } from "@/lib/firestore/teams";
 import { listAllUsers } from "@/lib/firestore/users";
-import type { Category, Exhibition, Team, UserProfile } from "@/types/models";
+import type { Category, Exhibition, MemberType, Team, UserProfile } from "@/types/models";
 import { toCsv, downloadCsv } from "@/lib/utils/csv";
 import { Breadcrumb, CenteredSpinner } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 interface Applicant {
   uid: string;
   name: string;
+  memberType: MemberType;
   department: string;
   grade: string;
   studentId: string;
@@ -71,9 +72,10 @@ function ApplicantsManager() {
         list.push({
           uid,
           name: u.name,
+          memberType: u.memberType ?? "student",
           department: u.department || "-",
-          grade: u.grade,
-          studentId: u.studentId,
+          grade: u.grade || "-",
+          studentId: u.studentId || "-",
           teamName: team.name,
         });
       }
@@ -83,8 +85,15 @@ function ApplicantsManager() {
 
   function handleDownload(category: Category, applicants: Applicant[]) {
     const csv = toCsv(
-      ["이름", "학과", "학년", "학번", "팀명"],
-      applicants.map((a) => [a.name, a.department, a.grade, a.studentId, a.teamName])
+      ["이름", "구분", "학과/소속", "학년", "학번/사번", "팀명"],
+      applicants.map((a) => [
+        a.name,
+        a.memberType === "staff" ? "교직원" : "학생",
+        a.department,
+        a.grade,
+        a.studentId,
+        a.teamName,
+      ])
     );
     downloadCsv(`${category.name}_신청자명단.csv`, csv);
   }
@@ -124,9 +133,10 @@ function ApplicantsManager() {
                     <thead>
                       <tr className="border-b border-border text-xs text-muted">
                         <th className="py-2 pr-4 font-semibold">이름</th>
-                        <th className="py-2 pr-4 font-semibold">학과</th>
+                        <th className="py-2 pr-4 font-semibold">구분</th>
+                        <th className="py-2 pr-4 font-semibold">학과/소속</th>
                         <th className="py-2 pr-4 font-semibold">학년</th>
-                        <th className="py-2 pr-4 font-semibold">학번</th>
+                        <th className="py-2 pr-4 font-semibold">학번/사번</th>
                         <th className="py-2 pr-4 font-semibold">팀명</th>
                       </tr>
                     </thead>
@@ -134,6 +144,7 @@ function ApplicantsManager() {
                       {applicants.map((a) => (
                         <tr key={a.uid} className="border-b border-border last:border-0">
                           <td className="py-2 pr-4">{a.name}</td>
+                          <td className="py-2 pr-4">{a.memberType === "staff" ? "교직원" : "학생"}</td>
                           <td className="py-2 pr-4">{a.department}</td>
                           <td className="py-2 pr-4">{a.grade}</td>
                           <td className="py-2 pr-4">{a.studentId}</td>

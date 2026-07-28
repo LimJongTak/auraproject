@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { Heart, Trophy } from "lucide-react";
 import type { Exhibition } from "@/types/models";
 import { Badge } from "@/components/ui/misc";
 
@@ -9,7 +9,12 @@ export function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
       href={`/exhibitions/${exhibition.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-white transition hover:-translate-y-1 hover:shadow-lg"
     >
-      <div className="aspect-[4/3] w-full overflow-hidden bg-surface">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface">
+        {exhibition.award && (
+          <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-amber-950 shadow">
+            <Trophy size={12} /> {exhibition.award.label}
+          </span>
+        )}
         {exhibition.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

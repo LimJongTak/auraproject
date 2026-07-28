@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Trophy } from "lucide-react";
 import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
 import { getMembership } from "@/lib/firestore/teams";
 import type { Exhibition } from "@/types/models";
@@ -75,7 +75,14 @@ export default function ExhibitionDetailPage() {
       />
 
       <div className="mt-4 flex items-center justify-between">
-        <Badge>{exhibition.categoryName}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge>{exhibition.categoryName}</Badge>
+          {exhibition.award && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              <Trophy size={12} /> {exhibition.award.label}
+            </span>
+          )}
+        </div>
         {canEdit && (
           <div className="flex items-center gap-4">
             <Link
