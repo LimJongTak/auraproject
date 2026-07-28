@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, Trash2, Unlock } from "lucide-react";
 import { RequireAdmin } from "@/components/auth/Guard";
 import { subscribeCategories, createCategory, updateCategory, deleteCategory, type CategoryInput } from "@/lib/firestore/categories";
+import { listEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
 import { insertAtCursor } from "@/lib/utils/insertAtCursor";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
@@ -147,7 +148,21 @@ function CategoryForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Once judges have scored anything for this contest, editing the rubric
+  // (removing/renaming items) can orphan or shift the meaning of scores
+  // already keyed by the old item ids — so default to locked and require an
+  // explicit unlock for existing contests that already have evaluations.
+  const [evaluationCount, setEvaluationCount] = useState<number | null>(initial ? null : 0);
+  const [rubricUnlocked, setRubricUnlocked] = useState(false);
+  const rubricLocked = (evaluationCount ?? 0) > 0 && !rubricUnlocked;
+
+  useEffect(() => {
+    if (!initial) return;
+    listEvaluationsForCategory(initial.id).then((evs) => setEvaluationCount(evs.length));
+  }, [initial]);
+
   function addRubricItem() {
+    if (rubricLocked) return;
     setRubric((prev) => [
       ...prev,
       { id: crypto.randomUUID(), group: "", label: "", criteria: "", maxScore: 10 },
@@ -155,14 +170,17 @@ function CategoryForm({
   }
 
   function updateRubricItem(id: string, patch: Partial<RubricItem>) {
+    if (rubricLocked) return;
     setRubric((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
   function removeRubricItem(id: string) {
+    if (rubricLocked) return;
     setRubric((prev) => prev.filter((r) => r.id !== id));
   }
 
   function loadDefaultRubric() {
+    if (rubricLocked) return;
     if (rubric.length > 0 && !confirm("현재 문항을 기본 10문항으로 교체할까요?")) return;
     setRubric(DEFAULT_RUBRIC.map((r) => ({ ...r })));
   }
@@ -310,14 +328,37 @@ function CategoryForm({
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold">평가표 (심사위원이 작품을 채점할 문항)</span>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={loadDefaultRubric}>
+            <Button type="button" variant="outline" size="sm" onClick={loadDefaultRubric} disabled={rubricLocked}>
               기본 10문항 불러오기
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={addRubricItem}>
+            <Button type="button" variant="outline" size="sm" onClick={addRubricItem} disabled={rubricLocked}>
               <Plus size={14} /> 문항 추가
             </Button>
           </div>
         </div>
+
+        {(evaluationCount ?? 0) > 0 && (
+          <div className="flex flex-col gap-2 rounded-xl bg-amber-50 p-3 text-amber-800">
+            <p className="flex items-center gap-1.5 text-xs font-semibold">
+              <AlertTriangle size={14} /> 이미 채점된 평가가 {evaluationCount}건 있어요.
+            </p>
+            <p className="text-xs">
+              문항을 수정·삭제하면 기존에 매겨진 점수가 화면에서 어긋날 수 있어요. 필요한 경우에만 잠금을
+              해제해서 수정하세요.
+            </p>
+            {rubricLocked && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => setRubricUnlocked(true)}
+              >
+                <Unlock size={14} /> 잠금 해제하고 수정
+              </Button>
+            )}
+          </div>
+        )}
 
         {rubric.length === 0 ? (
           <p className="text-xs text-muted">아직 문항이 없어요. 기본 10문항을 불러오거나 직접 추가하세요.</p>
@@ -330,11 +371,13 @@ function CategoryForm({
                     <Input
                       placeholder="항목 (예: 독창성)"
                       value={r.group}
+                      disabled={rubricLocked}
                       onChange={(e) => updateRubricItem(r.id, { group: e.target.value })}
                     />
                     <Input
                       placeholder="세부 항목 (예: 문제 정의)"
                       value={r.label}
+                      disabled={rubricLocked}
                       onChange={(e) => updateRubricItem(r.id, { label: e.target.value })}
                     />
                     <Input
@@ -342,13 +385,15 @@ function CategoryForm({
                       min={1}
                       placeholder="배점"
                       value={r.maxScore}
+                      disabled={rubricLocked}
                       onChange={(e) => updateRubricItem(r.id, { maxScore: Math.max(0, parseInt(e.target.value, 10) || 0) })}
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => removeRubricItem(r.id)}
-                    className="mt-2.5 shrink-0 text-muted hover:text-red-600"
+                    disabled={rubricLocked}
+                    className="mt-2.5 shrink-0 text-muted hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -356,6 +401,7 @@ function CategoryForm({
                 <Textarea
                   placeholder="심사 기준"
                   value={r.criteria}
+                  disabled={rubricLocked}
                   onChange={(e) => updateRubricItem(r.id, { criteria: e.target.value })}
                   className="min-h-16"
                 />
