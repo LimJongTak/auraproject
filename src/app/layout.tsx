@@ -5,6 +5,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { Header } from "@/components/layout/Header";
 import { FirebaseConfigGate } from "@/components/layout/FirebaseConfigGate";
 import { VisitTracker } from "@/components/layout/VisitTracker";
+import { QuickLinksFloating } from "@/components/layout/QuickLinksFloating";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default function RootLayout({
             <VisitTracker />
             <Header />
             <main className="flex-1">{children}</main>
+            <QuickLinksFloating />
           </AuthProvider>
         </FirebaseConfigGate>
       </body>

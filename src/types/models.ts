@@ -182,3 +182,37 @@ export interface VisitStat {
   count: number;
   updatedAt: Timestamp;
 }
+
+// Curated icon key, not a free-form asset upload — see
+// src/lib/constants/quickLinkIcons.tsx for the actual icon components.
+export type QuickLinkIcon =
+  | "book-open"
+  | "library"
+  | "sparkles"
+  | "bot"
+  | "wand"
+  | "graduation-cap"
+  | "link"
+  | "globe"
+  | "message-circle"
+  | "newspaper"
+  | "video"
+  | "calendar"
+  | "help-circle"
+  | "star"
+  | "rocket"
+  | "megaphone"
+  | "compass";
+
+// Floating quick-link menu shown on the right edge of the page (desktop
+// only). Public read, admin-managed.
+export interface QuickLink {
+  id: string;
+  label: string;
+  url: string;
+  icon: QuickLinkIcon;
+  order: number;
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}

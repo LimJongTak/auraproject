@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   Megaphone,
   MessageSquare,
+  PanelRight,
   ShieldCheck,
   Users2,
 } from "lucide-react";
@@ -41,6 +42,12 @@ const CARDS = [
     title: "방문자 통계",
     desc: "일간·주간·월간·년간 방문자 수를 확인하고 엑셀로 내려받아요",
     icon: BarChart3,
+  },
+  {
+    href: "/admin/quicklinks",
+    title: "퀵메뉴 관리",
+    desc: "화면 오른쪽에 뜨는 바로가기 버튼을 추가·수정·삭제해요",
+    icon: PanelRight,
   },
 ];
 

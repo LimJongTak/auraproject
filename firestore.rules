@@ -94,6 +94,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------------- quick links (floating external-link menu) ----------------
+    match /quickLinks/{linkId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ---------------- inquiries (student -> admin) ----------------
     match /inquiries/{inquiryId} {
       allow get: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
