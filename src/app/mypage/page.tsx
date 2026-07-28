@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Heart, MessageCircle, Plus, ArrowRight, Trophy } from "lucide-react";
+import { User, Heart, MessageCircle, Plus, ArrowRight, Trophy, Pencil, KeyRound, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
@@ -47,6 +47,7 @@ function MyPageContent() {
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [inquiries, setInquiries] = useState<Inquiry[] | null>(null);
+  const [openPanel, setOpenPanel] = useState<"profile" | "password" | null>(null);
 
   useEffect(() => {
     if (!profile?.uid) return;
@@ -85,8 +86,31 @@ function MyPageContent() {
       </div>
 
       <div className="rounded-2xl border border-border bg-white p-6">
-        <p className="text-lg font-bold">{profile.name}</p>
-        <p className="mt-1 text-sm text-muted">{profile.email}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold">{profile.name}</p>
+            <p className="mt-1 text-sm text-muted">{profile.email}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenPanel((cur) => (cur === "profile" ? null : "profile"))}
+            >
+              {openPanel === "profile" ? <X size={14} /> : <Pencil size={14} />}
+              {openPanel === "profile" ? "닫기" : "정보 수정"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenPanel((cur) => (cur === "password" ? null : "password"))}
+            >
+              {openPanel === "password" ? <X size={14} /> : <KeyRound size={14} />}
+              {openPanel === "password" ? "닫기" : "비밀번호 변경"}
+            </Button>
+          </div>
+        </div>
+
         <div className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <InfoItem label="구분" value={profile.memberType === "staff" ? "교직원" : "학생"} />
           <InfoItem label="학교" value={profile.school} />
@@ -94,9 +118,18 @@ function MyPageContent() {
           {profile.memberType === "student" && <InfoItem label="학년" value={profile.grade || "-"} />}
           <InfoItem label={profile.memberType === "staff" ? "사번" : "학번"} value={profile.studentId || "-"} />
         </div>
-      </div>
 
-      <ProfileEditCard profile={profile} />
+        {openPanel === "profile" && (
+          <div className="mt-6 border-t border-border pt-6">
+            <ProfileEditFields profile={profile} />
+          </div>
+        )}
+        {openPanel === "password" && firebaseUser && (
+          <div className="mt-6 border-t border-border pt-6">
+            <PasswordChangeFields firebaseUser={firebaseUser} />
+          </div>
+        )}
+      </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-white p-6">
         <div className="flex items-center justify-between">
@@ -195,13 +228,11 @@ function MyPageContent() {
           </ul>
         )}
       </div>
-
-      {firebaseUser && <PasswordChangeCard firebaseUser={firebaseUser} />}
     </div>
   );
 }
 
-function ProfileEditCard({ profile }: { profile: UserProfile }) {
+function ProfileEditFields({ profile }: { profile: UserProfile }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const {
@@ -233,42 +264,39 @@ function ProfileEditCard({ profile }: { profile: UserProfile }) {
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-      <h2 className="font-bold">회원정보 수정</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-4">
-        <ProfileFields
-          values={{
-            memberType: profileValues[0],
-            school: profileValues[1],
-            department: profileValues[2],
-            grade: profileValues[3],
-            studentId: profileValues[4],
-          }}
-          onChange={(key, value) => setValue(key, value as never, { shouldValidate: true })}
-          errors={{
-            school: errors.school?.message,
-            department: errors.department?.message,
-            grade: errors.grade?.message,
-            studentId: errors.studentId?.message,
-          }}
-        />
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <ProfileFields
+        values={{
+          memberType: profileValues[0],
+          school: profileValues[1],
+          department: profileValues[2],
+          grade: profileValues[3],
+          studentId: profileValues[4],
+        }}
+        onChange={(key, value) => setValue(key, value as never, { shouldValidate: true })}
+        errors={{
+          school: errors.school?.message,
+          department: errors.department?.message,
+          grade: errors.grade?.message,
+          studentId: errors.studentId?.message,
+        }}
+      />
 
-        {submitError && <ErrorText>{submitError}</ErrorText>}
-        {success && (
-          <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
-            회원정보가 저장됐어요.
-          </p>
-        )}
+      {submitError && <ErrorText>{submitError}</ErrorText>}
+      {success && (
+        <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
+          회원정보가 저장됐어요.
+        </p>
+      )}
 
-        <Button type="submit" loading={isSubmitting} className="self-start">
-          저장
-        </Button>
-      </form>
-    </div>
+      <Button type="submit" loading={isSubmitting} className="self-start">
+        저장
+      </Button>
+    </form>
   );
 }
 
-function PasswordChangeCard({ firebaseUser }: { firebaseUser: FirebaseUser }) {
+function PasswordChangeFields({ firebaseUser }: { firebaseUser: FirebaseUser }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const {
@@ -291,40 +319,37 @@ function PasswordChangeCard({ firebaseUser }: { firebaseUser: FirebaseUser }) {
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-      <h2 className="font-bold">비밀번호 변경</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-4">
-        <Input
-          label="현재 비밀번호"
-          type="password"
-          {...register("currentPassword")}
-          error={errors.currentPassword?.message}
-        />
-        <Input
-          label="새 비밀번호"
-          type="password"
-          {...register("newPassword")}
-          error={errors.newPassword?.message}
-        />
-        <Input
-          label="새 비밀번호 확인"
-          type="password"
-          {...register("newPasswordConfirm")}
-          error={errors.newPasswordConfirm?.message}
-        />
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Input
+        label="현재 비밀번호"
+        type="password"
+        {...register("currentPassword")}
+        error={errors.currentPassword?.message}
+      />
+      <Input
+        label="새 비밀번호"
+        type="password"
+        {...register("newPassword")}
+        error={errors.newPassword?.message}
+      />
+      <Input
+        label="새 비밀번호 확인"
+        type="password"
+        {...register("newPasswordConfirm")}
+        error={errors.newPasswordConfirm?.message}
+      />
 
-        {submitError && <ErrorText>{submitError}</ErrorText>}
-        {success && (
-          <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
-            비밀번호가 변경됐어요.
-          </p>
-        )}
+      {submitError && <ErrorText>{submitError}</ErrorText>}
+      {success && (
+        <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
+          비밀번호가 변경됐어요.
+        </p>
+      )}
 
-        <Button type="submit" loading={isSubmitting} className="self-start">
-          비밀번호 변경
-        </Button>
-      </form>
-    </div>
+      <Button type="submit" loading={isSubmitting} className="self-start">
+        비밀번호 변경
+      </Button>
+    </form>
   );
 }
 
