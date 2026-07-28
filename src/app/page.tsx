@@ -9,7 +9,12 @@ import { subscribeMyMemberships } from "@/lib/firestore/teams";
 import type { Exhibition, TeamMembership } from "@/types/models";
 import { ContestBanners } from "@/components/home/ContestBanners";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
+import { ExhibitionMarquee } from "@/components/exhibitions/ExhibitionMarquee";
 import { Button } from "@/components/ui/Button";
+
+// Below this count a static grid reads better; above it, a static grid would
+// just clip items, so we switch to the auto-scrolling marquee instead.
+const MARQUEE_THRESHOLD = 6;
 
 export default function HomePage() {
   const { firebaseUser, profile } = useAuth();
@@ -17,7 +22,7 @@ export default function HomePage() {
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
 
   useEffect(() => {
-    listPublishedExhibitions({ sort: "latest", max: 6 }).then(setRecent);
+    listPublishedExhibitions({ sort: "latest", max: 18 }).then(setRecent);
   }, []);
 
   useEffect(() => {
@@ -95,11 +100,21 @@ export default function HomePage() {
             전체보기
           </Link>
         </div>
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {recent === null
-            ? Array.from({ length: 3 }).map((_, i) => <ExhibitionCardSkeleton key={i} />)
-            : recent.map((e) => <ExhibitionCard key={e.id} exhibition={e} />)}
-        </div>
+        {recent === null ? (
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <ExhibitionCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : recent.length > MARQUEE_THRESHOLD ? (
+          <ExhibitionMarquee exhibitions={recent} />
+        ) : (
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {recent.map((e) => (
+              <ExhibitionCard key={e.id} exhibition={e} />
+            ))}
+          </div>
+        )}
         {recent && recent.length === 0 && (
           <p className="mt-6 text-center text-sm text-muted">아직 등록된 전시물이 없어요.</p>
         )}

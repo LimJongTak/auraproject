@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
@@ -67,21 +68,37 @@ function JudgeCategoryDetail() {
         <ul className="mt-6 flex flex-col gap-3">
           {exhibitions.map((ex) => (
             <li key={ex.id} className="rounded-2xl border border-border bg-white p-4">
-              <button
-                type="button"
-                onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
-                className="flex w-full items-center justify-between gap-3 text-left"
-              >
-                <div>
-                  <p className="font-bold">{ex.title}</p>
+              <div className="flex w-full items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate font-bold">{ex.title}</p>
                   <p className="text-sm text-muted">{ex.teamName}</p>
+                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Link
+                    href={`/exhibitions/${ex.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                  >
+                    <ExternalLink size={13} /> 작품 보기
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
+                    aria-label={expandedId === ex.id ? "접기" : "펼치기"}
+                  >
+                    {expandedId === ex.id ? (
+                      <ChevronUp size={18} className="shrink-0 text-muted" />
+                    ) : (
+                      <ChevronDown size={18} className="shrink-0 text-muted" />
+                    )}
+                  </button>
                 </div>
-                {expandedId === ex.id ? (
-                  <ChevronUp size={18} className="shrink-0 text-muted" />
-                ) : (
-                  <ChevronDown size={18} className="shrink-0 text-muted" />
-                )}
-              </button>
+              </div>
               {expandedId === ex.id && (
                 <div className="mt-4 border-t border-border pt-4">
                   <ScoreForm

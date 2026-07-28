@@ -12,6 +12,9 @@
 }
 
 @theme inline {
+  /* Custom breakpoint: the header (logo + full nav + auth buttons) only fits
+     starting here — below it we fall back to the hamburger menu. */
+  --breakpoint-nav: 1335px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--color-primary);
@@ -33,4 +36,23 @@ body {
 ::selection {
   background: var(--color-primary-light);
   color: var(--color-primary-dark);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }

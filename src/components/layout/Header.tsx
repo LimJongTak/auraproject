@@ -45,9 +45,9 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border bg-white/90 backdrop-blur">
-      <div className="relative flex h-16 w-full items-center justify-between px-4 md:h-[100px] md:pl-4 md:pr-8">
+      <div className="relative flex h-16 w-full items-center justify-between px-4 nav:h-[100px] nav:pl-4 nav:pr-8">
         <button
-          className="relative z-10 shrink-0 text-foreground md:hidden"
+          className="relative z-10 shrink-0 text-foreground nav:hidden"
           onClick={() => setMenuOpen((v) => !v)}
           aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}
         >
@@ -80,23 +80,23 @@ export function Header() {
 
         <Link
           href="/"
-          className="absolute left-1/2 flex shrink-0 -translate-x-1/2 items-center gap-1.5 sm:gap-2.5 md:static md:left-auto md:translate-x-0 md:gap-3"
+          className="absolute left-1/2 flex shrink-0 -translate-x-1/2 items-center gap-1.5 sm:gap-2.5 nav:static nav:left-auto nav:translate-x-0 nav:gap-3"
         >
           <Image
             src="/scnu-logo.png"
             alt="국립순천대학교"
             width={237}
             height={58}
-            className="hidden md:block md:h-11 md:w-auto"
+            className="hidden nav:block nav:h-11 nav:w-auto"
             priority
           />
-          <span className="hidden h-8 w-px bg-neutral-300 md:block" />
-          <span className="whitespace-nowrap text-sm font-semibold text-neutral-900 sm:text-base md:text-xl">
+          <span className="hidden h-8 w-px bg-neutral-300 nav:block" />
+          <span className="whitespace-nowrap text-sm font-semibold text-neutral-900 sm:text-base nav:text-xl">
             AI인재양성부트캠프사업단
           </span>
         </Link>
 
-        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex">
+        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 nav:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -146,7 +146,7 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center justify-end gap-3">
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-3 nav:flex">
             {loading ? null : firebaseUser ? (
               <>
                 <span className="text-sm text-muted">{profile?.name ?? firebaseUser.email}님</span>
@@ -185,7 +185,7 @@ export function Header() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-0 top-16 bottom-0 z-30 flex flex-col overflow-y-auto bg-white md:hidden"
+            className="fixed inset-x-0 top-16 bottom-0 z-30 flex flex-col overflow-y-auto bg-white nav:hidden"
           >
             <nav className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6">
               {mobileLinks.map((link, i) => (
