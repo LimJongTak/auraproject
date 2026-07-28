@@ -13,6 +13,7 @@ import { LinkPreviewCard } from "@/components/link-preview/LinkPreviewCard";
 import { LikeButton } from "@/components/exhibitions/LikeButton";
 import { CommentSection } from "@/components/exhibitions/CommentSection";
 import { PdfPageScroller } from "@/components/exhibitions/PdfPageScroller";
+import { JudgeFloatingScorePanel } from "@/components/judge/JudgeFloatingScorePanel";
 import { cn } from "@/lib/utils/cn";
 
 export default function ExhibitionDetailPage() {
@@ -151,6 +152,8 @@ export default function ExhibitionDetailPage() {
           <CommentSection exhibitionId={exhibition.id} />
         )}
       </div>
+
+      <JudgeFloatingScorePanel exhibition={exhibition} />
     </div>
   );
 }

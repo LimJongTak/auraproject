@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Evaluation } from "@/types/models";
 
@@ -35,17 +35,31 @@ export async function upsertEvaluation(input: UpsertEvaluationInput): Promise<vo
   );
 }
 
-export async function getMyEvaluation(judgeUid: string, exhibitionId: string): Promise<Evaluation | null> {
-  const snap = await getDoc(doc(db, "evaluations", evalId(judgeUid, exhibitionId)));
-  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Evaluation) : null;
+// Live per-judge, per-submission score — used wherever a single judge's own
+// evaluation for one exhibition needs to stay in sync across views (e.g. the
+// exhibition detail page's floating scoring panel) without a manual refetch.
+export function subscribeMyEvaluation(
+  judgeUid: string,
+  exhibitionId: string,
+  cb: (evaluation: Evaluation | null) => void
+) {
+  return onSnapshot(doc(db, "evaluations", evalId(judgeUid, exhibitionId)), (snap) => {
+    cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Evaluation) : null);
+  });
+}
+
+// Live list of every judge's evaluations for a contest — used by the judge
+// list page (per-submission "채점완료" status) and the admin award ranking
+// panel, so a score entered anywhere (including the exhibition page's
+// floating panel) shows up immediately in both places.
+export function subscribeEvaluationsForCategory(categoryId: string, cb: (evaluations: Evaluation[]) => void) {
+  const q = query(evaluationsRef(), where("categoryId", "==", categoryId));
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation)));
+  });
 }
 
 export async function listEvaluationsForCategory(categoryId: string): Promise<Evaluation[]> {
   const snap = await getDocs(query(evaluationsRef(), where("categoryId", "==", categoryId)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation));
-}
-
-export async function listEvaluationsForExhibition(exhibitionId: string): Promise<Evaluation[]> {
-  const snap = await getDocs(query(evaluationsRef(), where("exhibitionId", "==", exhibitionId)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Evaluation));
 }

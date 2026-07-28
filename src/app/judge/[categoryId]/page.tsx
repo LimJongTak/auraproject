@@ -8,11 +8,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
 import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/exhibitions";
-import { getMyEvaluation, listEvaluationsForCategory, upsertEvaluation } from "@/lib/firestore/evaluations";
-import type { Category, Evaluation, Exhibition, RubricItem } from "@/types/models";
+import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
+import { RubricScoreForm } from "@/components/judge/RubricScoreForm";
+import type { Category, Evaluation, Exhibition } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
-import { Textarea } from "@/components/ui/Field";
+import { cn } from "@/lib/utils/cn";
 
 const AWARD_PRESETS = ["대상", "최우수상", "우수상", "1등", "2등", "3등"];
 
@@ -29,6 +30,7 @@ function JudgeCategoryDetail() {
   const { profile } = useAuth();
   const [category, setCategory] = useState<Category | null | undefined>(undefined);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
+  const [evaluations, setEvaluations] = useState<Evaluation[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,6 +40,23 @@ function JudgeCategoryDetail() {
   useEffect(() => {
     listPublishedExhibitions({ categoryId: params.categoryId, max: 500 }).then(setExhibitions);
   }, [params.categoryId]);
+
+  // Live — a score entered here, or from the exhibition detail page's
+  // floating scoring panel, shows up in this list and the award panel below
+  // without needing a refresh.
+  useEffect(() => {
+    const unsub = subscribeEvaluationsForCategory(params.categoryId, setEvaluations);
+    return () => unsub();
+  }, [params.categoryId]);
+
+  const myEvalByExhibition = useMemo(() => {
+    const map = new Map<string, Evaluation>();
+    if (!evaluations || !profile) return map;
+    for (const ev of evaluations) {
+      if (ev.judgeUid === profile.uid) map.set(ev.exhibitionId, ev);
+    }
+    return map;
+  }, [evaluations, profile]);
 
   if (category === undefined || exhibitions === null || !profile) return <CenteredSpinner />;
   if (category === null) {
@@ -66,171 +85,72 @@ function JudgeCategoryDetail() {
         </div>
       ) : (
         <ul className="mt-6 flex flex-col gap-3">
-          {exhibitions.map((ex) => (
-            <li key={ex.id} className="rounded-2xl border border-border bg-white p-4">
-              <div className="flex w-full items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <p className="truncate font-bold">{ex.title}</p>
-                  <p className="text-sm text-muted">{ex.teamName}</p>
-                </button>
-                <div className="flex shrink-0 items-center gap-3">
-                  <Link
-                    href={`/exhibitions/${ex.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
-                  >
-                    <ExternalLink size={13} /> 작품 보기
-                  </Link>
+          {exhibitions.map((ex) => {
+            const myEval = myEvalByExhibition.get(ex.id) ?? null;
+            return (
+              <li key={ex.id} className="rounded-2xl border border-border bg-white p-4">
+                <div className="flex w-full items-center justify-between gap-3">
                   <button
                     type="button"
                     onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
-                    aria-label={expandedId === ex.id ? "접기" : "펼치기"}
+                    className="min-w-0 flex-1 text-left"
                   >
-                    {expandedId === ex.id ? (
-                      <ChevronUp size={18} className="shrink-0 text-muted" />
-                    ) : (
-                      <ChevronDown size={18} className="shrink-0 text-muted" />
-                    )}
+                    <p className="truncate font-bold">{ex.title}</p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <p className="text-sm text-muted">{ex.teamName}</p>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                          myEval ? "bg-primary-light text-primary-dark" : "bg-surface text-muted"
+                        )}
+                      >
+                        {myEval ? `채점완료 · ${myEval.totalScore}점` : "미채점"}
+                      </span>
+                    </div>
                   </button>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Link
+                      href={`/exhibitions/${ex.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                    >
+                      <ExternalLink size={13} /> 작품 보기
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
+                      aria-label={expandedId === ex.id ? "접기" : "펼치기"}
+                    >
+                      {expandedId === ex.id ? (
+                        <ChevronUp size={18} className="shrink-0 text-muted" />
+                      ) : (
+                        <ChevronDown size={18} className="shrink-0 text-muted" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              {expandedId === ex.id && (
-                <div className="mt-4 border-t border-border pt-4">
-                  <ScoreForm
-                    exhibition={ex}
-                    category={category}
-                    rubric={rubric}
-                    judgeUid={profile.uid}
-                    judgeName={profile.name}
-                  />
-                </div>
-              )}
-            </li>
-          ))}
+                {expandedId === ex.id && (
+                  <div className="mt-4 border-t border-border pt-4">
+                    <RubricScoreForm
+                      exhibitionId={ex.id}
+                      categoryId={category.id}
+                      rubric={rubric}
+                      judgeUid={profile.uid}
+                      judgeName={profile.name}
+                      initial={myEval}
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      {profile.role === "admin" && rubric.length > 0 && exhibitions.length > 0 && (
-        <AwardPanel categoryId={category.id} exhibitions={exhibitions} />
+      {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
+        <AwardPanel exhibitions={exhibitions} evaluations={evaluations} />
       )}
-    </div>
-  );
-}
-
-function ScoreForm({
-  exhibition,
-  category,
-  rubric,
-  judgeUid,
-  judgeName,
-}: {
-  exhibition: Exhibition;
-  category: Category;
-  rubric: RubricItem[];
-  judgeUid: string;
-  judgeName: string;
-}) {
-  const [scores, setScores] = useState<Record<string, number>>({});
-  const [comment, setComment] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    setSaved(false);
-    getMyEvaluation(judgeUid, exhibition.id).then((ev) => {
-      setScores(ev?.scores ?? {});
-      setComment(ev?.comment ?? "");
-      setLoading(false);
-    });
-  }, [judgeUid, exhibition.id]);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, RubricItem[]>();
-    for (const item of rubric) {
-      const list = map.get(item.group) ?? [];
-      list.push(item);
-      map.set(item.group, list);
-    }
-    return Array.from(map.entries());
-  }, [rubric]);
-
-  const total = rubric.reduce((sum, item) => sum + (scores[item.id] ?? 0), 0);
-  const maxTotal = rubric.reduce((sum, item) => sum + item.maxScore, 0);
-
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    try {
-      await upsertEvaluation({
-        exhibitionId: exhibition.id,
-        categoryId: category.id,
-        judgeUid,
-        judgeName,
-        scores,
-        totalScore: total,
-        comment: comment.trim() || null,
-      });
-      setSaved(true);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) return <p className="text-sm text-muted">불러오는 중...</p>;
-
-  return (
-    <div className="flex flex-col gap-4">
-      {groups.map(([group, items]) => (
-        <div key={group} className="flex flex-col gap-2">
-          <p className="text-sm font-bold">{group}</p>
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{item.label}</p>
-                <p className="text-xs text-muted">{item.criteria}</p>
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={item.maxScore}
-                value={scores[item.id] ?? 0}
-                onChange={(e) => {
-                  const v = Math.max(0, Math.min(item.maxScore, parseInt(e.target.value, 10) || 0));
-                  setScores((prev) => ({ ...prev, [item.id]: v }));
-                }}
-                className="w-16 shrink-0 rounded-lg border border-border px-2 py-1 text-right text-sm outline-none focus:border-primary"
-              />
-              <span className="shrink-0 text-xs text-muted">/ {item.maxScore}</span>
-            </div>
-          ))}
-        </div>
-      ))}
-
-      <Textarea
-        label="코멘트 (선택)"
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        className="min-h-20"
-      />
-
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">
-          합계 {total} / {maxTotal}점
-        </p>
-        <div className="flex items-center gap-3">
-          {saved && <span className="text-xs font-medium text-primary">저장됨</span>}
-          <Button size="sm" loading={saving} onClick={handleSave}>
-            저장
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -241,14 +161,9 @@ interface AwardDraft {
   rank: string;
 }
 
-function AwardPanel({ categoryId, exhibitions }: { categoryId: string; exhibitions: Exhibition[] }) {
-  const [evaluations, setEvaluations] = useState<Evaluation[] | null>(null);
+function AwardPanel({ exhibitions, evaluations }: { exhibitions: Exhibition[]; evaluations: Evaluation[] }) {
   const [drafts, setDrafts] = useState<Record<string, AwardDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    listEvaluationsForCategory(categoryId).then(setEvaluations);
-  }, [categoryId]);
 
   useEffect(() => {
     setDrafts((prev) => {
@@ -265,8 +180,6 @@ function AwardPanel({ categoryId, exhibitions }: { categoryId: string; exhibitio
       return next;
     });
   }, [exhibitions]);
-
-  if (!evaluations) return <CenteredSpinner />;
 
   const byExhibition = new Map<string, Evaluation[]>();
   for (const ev of evaluations) {
