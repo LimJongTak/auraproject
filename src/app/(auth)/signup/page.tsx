@@ -9,10 +9,11 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 import { toKoreanAuthError } from "@/lib/firebase/errors";
-import { signupSchema, type SignupFormValues } from "@/lib/validation/authSchemas";
+import { SCHOOL_OPTIONS, signupSchema, type SignupFormValues } from "@/lib/validation/authSchemas";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/misc";
+import { ProfileFields } from "@/components/profile/ProfileFields";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,8 +21,20 @@ export default function SignupPage() {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<SignupFormValues>({ resolver: zodResolver(signupSchema) });
+  } = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      memberType: "student",
+      school: SCHOOL_OPTIONS[0],
+      department: "",
+      grade: "",
+      studentId: "",
+    },
+  });
+  const profileValues = watch(["memberType", "school", "department", "grade", "studentId"]);
 
   async function onSubmit(values: SignupFormValues) {
     setSubmitError(null);
@@ -31,6 +44,7 @@ export default function SignupPage() {
       await setDoc(doc(db, "users", credential.user.uid), {
         name: values.name,
         phone: values.phone,
+        memberType: values.memberType,
         school: values.school,
         department: values.department,
         grade: values.grade,
@@ -60,17 +74,22 @@ export default function SignupPage() {
           {...register("phone")}
           error={errors.phone?.message}
         />
-        <Input label="학교" placeholder="OO대학교" {...register("school")} error={errors.school?.message} />
-        <Input label="학과" placeholder="컴퓨터공학과" {...register("department")} error={errors.department?.message} />
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="학년" placeholder="3학년" {...register("grade")} error={errors.grade?.message} />
-          <Input
-            label="학번"
-            placeholder="20231234"
-            {...register("studentId")}
-            error={errors.studentId?.message}
-          />
-        </div>
+        <ProfileFields
+          values={{
+            memberType: profileValues[0],
+            school: profileValues[1],
+            department: profileValues[2],
+            grade: profileValues[3],
+            studentId: profileValues[4],
+          }}
+          onChange={(key, value) => setValue(key, value as never, { shouldValidate: true })}
+          errors={{
+            school: errors.school?.message,
+            department: errors.department?.message,
+            grade: errors.grade?.message,
+            studentId: errors.studentId?.message,
+          }}
+        />
         <Input
           label="이메일"
           type="email"

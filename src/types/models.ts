@@ -2,13 +2,17 @@ import type { Timestamp } from "firebase/firestore";
 
 export type UserRole = "user" | "admin" | "judge";
 
+export type MemberType = "student" | "staff";
+
 export interface UserProfile {
   uid: string;
   name: string;
   phone: string;
+  memberType: MemberType;
   school: string;
   department: string;
   grade: string;
+  // 학생이면 학번(숫자 8자리), 교직원이면 사번(자유 입력, 선택).
   studentId: string;
   email: string;
   role: UserRole;

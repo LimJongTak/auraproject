@@ -12,11 +12,13 @@ import { getTeam, subscribeMyMemberships } from "@/lib/firestore/teams";
 import { subscribeMyInquiries } from "@/lib/firestore/inquiries";
 import { changePassword } from "@/lib/auth/changePassword";
 import { toKoreanAuthError } from "@/lib/firebase/errors";
-import { changePasswordSchema, type ChangePasswordFormValues } from "@/lib/validation/authSchemas";
-import type { Exhibition, ExhibitionStatus, Inquiry, Team, TeamMembership } from "@/types/models";
+import { changePasswordSchema, profileEditSchema, type ChangePasswordFormValues, type ProfileEditFormValues } from "@/lib/validation/authSchemas";
+import { updateMyProfile } from "@/lib/firestore/users";
+import type { Exhibition, ExhibitionStatus, Inquiry, Team, TeamMembership, UserProfile } from "@/types/models";
 import { Badge, CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { ProfileFields } from "@/components/profile/ProfileFields";
 import type { User as FirebaseUser } from "firebase/auth";
 import { cn } from "@/lib/utils/cn";
 
@@ -86,12 +88,15 @@ function MyPageContent() {
         <p className="text-lg font-bold">{profile.name}</p>
         <p className="mt-1 text-sm text-muted">{profile.email}</p>
         <div className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+          <InfoItem label="구분" value={profile.memberType === "staff" ? "교직원" : "학생"} />
           <InfoItem label="학교" value={profile.school} />
           <InfoItem label="학과" value={profile.department || "-"} />
           <InfoItem label="학년" value={profile.grade} />
-          <InfoItem label="학번" value={profile.studentId} />
+          <InfoItem label={profile.memberType === "staff" ? "사번" : "학번"} value={profile.studentId || "-"} />
         </div>
       </div>
+
+      <ProfileEditCard profile={profile} />
 
       <div className="mt-6 rounded-2xl border border-border bg-white p-6">
         <div className="flex items-center justify-between">
@@ -192,6 +197,73 @@ function MyPageContent() {
       </div>
 
       {firebaseUser && <PasswordChangeCard firebaseUser={firebaseUser} />}
+    </div>
+  );
+}
+
+function ProfileEditCard({ profile }: { profile: UserProfile }) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const {
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileEditFormValues>({
+    resolver: zodResolver(profileEditSchema),
+    defaultValues: {
+      memberType: profile.memberType,
+      school: profile.school,
+      department: profile.department,
+      grade: profile.grade,
+      studentId: profile.studentId,
+    },
+  });
+  const profileValues = watch(["memberType", "school", "department", "grade", "studentId"]);
+
+  async function onSubmit(values: ProfileEditFormValues) {
+    setSubmitError(null);
+    setSuccess(false);
+    try {
+      await updateMyProfile(profile.uid, values);
+      setSuccess(true);
+    } catch {
+      setSubmitError("저장에 실패했어요");
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-white p-6">
+      <h2 className="font-bold">회원정보 수정</h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-4">
+        <ProfileFields
+          values={{
+            memberType: profileValues[0],
+            school: profileValues[1],
+            department: profileValues[2],
+            grade: profileValues[3],
+            studentId: profileValues[4],
+          }}
+          onChange={(key, value) => setValue(key, value as never, { shouldValidate: true })}
+          errors={{
+            school: errors.school?.message,
+            department: errors.department?.message,
+            grade: errors.grade?.message,
+            studentId: errors.studentId?.message,
+          }}
+        />
+
+        {submitError && <ErrorText>{submitError}</ErrorText>}
+        {success && (
+          <p className="rounded-xl bg-primary-light px-4 py-3 text-sm font-medium text-primary-dark">
+            회원정보가 저장됐어요.
+          </p>
+        )}
+
+        <Button type="submit" loading={isSubmitting} className="self-start">
+          저장
+        </Button>
+      </form>
     </div>
   );
 }

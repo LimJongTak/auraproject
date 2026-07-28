@@ -11,3 +11,15 @@ export async function listAllUsers(): Promise<UserProfile[]> {
 export async function setUserRole(uid: string, role: UserRole): Promise<void> {
   await updateDoc(doc(db, "users", uid), { role });
 }
+
+export interface ProfileUpdateInput {
+  memberType: UserProfile["memberType"];
+  school: string;
+  department: string;
+  grade: string;
+  studentId: string;
+}
+
+export async function updateMyProfile(uid: string, input: ProfileUpdateInput): Promise<void> {
+  await updateDoc(doc(db, "users", uid), { ...input });
+}
