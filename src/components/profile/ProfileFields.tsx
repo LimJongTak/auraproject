@@ -8,6 +8,8 @@ import {
   GRADE_OPTIONS,
   SCHOOL_CUSTOM_OPTION,
   SCHOOL_OPTIONS,
+  STAFF_DEPARTMENT_CUSTOM_OPTION,
+  STAFF_DEPARTMENT_OPTIONS,
 } from "@/lib/validation/authSchemas";
 import type { MemberType } from "@/types/models";
 import { Input, Select } from "@/components/ui/Field";
@@ -46,6 +48,8 @@ export function ProfileFields({ values, onChange, errors }: ProfileFieldsProps) 
               onClick={() => {
                 onChange("memberType", type);
                 onChange("studentId", "");
+                onChange("department", "");
+                onChange("grade", "");
               }}
             >
               {type === "student" ? "학생" : "교직원"}
@@ -65,37 +69,45 @@ export function ProfileFields({ values, onChange, errors }: ProfileFieldsProps) 
       />
 
       <SelectOrCustom
-        label="학과"
+        key={values.memberType}
+        label={values.memberType === "staff" ? "소속" : "학과"}
         value={values.department}
         onChange={(v) => onChange("department", v)}
-        options={DEPARTMENT_OPTIONS}
-        customOption={DEPARTMENT_CUSTOM_OPTION}
-        customPlaceholder="학과명을 입력해주세요"
+        options={values.memberType === "staff" ? STAFF_DEPARTMENT_OPTIONS : DEPARTMENT_OPTIONS}
+        customOption={values.memberType === "staff" ? STAFF_DEPARTMENT_CUSTOM_OPTION : DEPARTMENT_CUSTOM_OPTION}
+        customPlaceholder={values.memberType === "staff" ? "소속을 입력해주세요" : "학과명을 입력해주세요"}
         error={errors?.department}
       />
 
-      <div className="grid grid-cols-2 gap-4">
-        <SelectOrCustom
-          label="학년"
-          value={values.grade}
-          onChange={(v) => onChange("grade", v)}
-          options={GRADE_OPTIONS}
-          customOption={GRADE_CUSTOM_OPTION}
-          customPlaceholder="학년을 입력해주세요"
-          error={errors?.grade}
-        />
+      {values.memberType === "student" ? (
+        <div className="grid grid-cols-2 gap-4">
+          <SelectOrCustom
+            label="학년"
+            value={values.grade}
+            onChange={(v) => onChange("grade", v)}
+            options={GRADE_OPTIONS}
+            customOption={GRADE_CUSTOM_OPTION}
+            customPlaceholder="학년을 입력해주세요"
+            error={errors?.grade}
+          />
+          <Input
+            label="학번 (숫자 8자리)"
+            placeholder="20231234"
+            value={values.studentId}
+            inputMode="numeric"
+            onChange={(e) => onChange("studentId", e.target.value.replace(/\D/g, "").slice(0, 8))}
+            error={errors?.studentId}
+          />
+        </div>
+      ) : (
         <Input
-          label={values.memberType === "student" ? "학번 (숫자 8자리)" : "사번 (선택)"}
-          placeholder={values.memberType === "student" ? "20231234" : "자유 입력"}
+          label="사번 (선택)"
+          placeholder="자유 입력"
           value={values.studentId}
-          inputMode={values.memberType === "student" ? "numeric" : "text"}
-          onChange={(e) => {
-            const raw = e.target.value;
-            onChange("studentId", values.memberType === "student" ? raw.replace(/\D/g, "").slice(0, 8) : raw);
-          }}
+          onChange={(e) => onChange("studentId", e.target.value)}
           error={errors?.studentId}
         />
-      </div>
+      )}
     </div>
   );
 }

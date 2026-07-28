@@ -90,8 +90,8 @@ function MyPageContent() {
         <div className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <InfoItem label="구분" value={profile.memberType === "staff" ? "교직원" : "학생"} />
           <InfoItem label="학교" value={profile.school} />
-          <InfoItem label="학과" value={profile.department || "-"} />
-          <InfoItem label="학년" value={profile.grade} />
+          <InfoItem label={profile.memberType === "staff" ? "소속" : "학과"} value={profile.department || "-"} />
+          {profile.memberType === "student" && <InfoItem label="학년" value={profile.grade || "-"} />}
           <InfoItem label={profile.memberType === "staff" ? "사번" : "학번"} value={profile.studentId || "-"} />
         </div>
       </div>

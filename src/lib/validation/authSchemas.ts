@@ -2,19 +2,28 @@ import { z } from "zod";
 
 export const SCHOOL_OPTIONS = ["국립순천대학교"] as const;
 export const DEPARTMENT_OPTIONS = ["인공지능공학전공", "전기공학전공", "전자공학전공"] as const;
+export const STAFF_DEPARTMENT_OPTIONS = [
+  "인공지능공학전공",
+  "전기공학전공",
+  "전자공학전공",
+  "AI인재양성부트캠프사업단",
+] as const;
 export const GRADE_OPTIONS = ["1학년", "2학년", "3학년", "4학년"] as const;
 export const SCHOOL_CUSTOM_OPTION = "직접입력";
 export const DEPARTMENT_CUSTOM_OPTION = "직접입력";
+export const STAFF_DEPARTMENT_CUSTOM_OPTION = "기타(직접입력)";
 export const GRADE_CUSTOM_OPTION = "기타";
 
 // Shared by signup and the MyPage profile-edit form — kept as a plain shape
 // (not a ZodObject with its own .refine) so each consumer can extend it with
-// its own additional fields before applying the studentId cross-field check.
+// its own additional fields before applying the studentId/grade cross-field
+// checks. `department` doubles as "소속" for staff, `grade` doesn't apply to
+// staff at all (required only for students).
 export const profileFieldsShape = {
   memberType: z.enum(["student", "staff"], { message: "구분을 선택해주세요" }),
   school: z.string().min(1, "학교를 입력해주세요").max(50),
-  department: z.string().min(1, "학과를 입력해주세요").max(50),
-  grade: z.string().min(1, "학년을 입력해주세요").max(20),
+  department: z.string().min(1, "학과/소속을 선택해주세요").max(50),
+  grade: z.string().max(20),
   studentId: z.string().max(20),
 };
 
@@ -25,6 +34,15 @@ export function refineStudentId(data: { memberType: string; studentId: string })
 export const STUDENT_ID_REFINE_ISSUE: { message: string; path: [string] } = {
   message: "학번은 숫자 8자리로 입력해주세요",
   path: ["studentId"],
+};
+
+export function refineGrade(data: { memberType: string; grade: string }): boolean {
+  return data.memberType !== "student" || data.grade.length > 0;
+}
+
+export const GRADE_REFINE_ISSUE: { message: string; path: [string] } = {
+  message: "학년을 선택해주세요",
+  path: ["grade"],
 };
 
 export const signupSchema = z
@@ -43,11 +61,15 @@ export const signupSchema = z
     message: "비밀번호가 일치하지 않아요",
     path: ["passwordConfirm"],
   })
-  .refine(refineStudentId, STUDENT_ID_REFINE_ISSUE);
+  .refine(refineStudentId, STUDENT_ID_REFINE_ISSUE)
+  .refine(refineGrade, GRADE_REFINE_ISSUE);
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
-export const profileEditSchema = z.object(profileFieldsShape).refine(refineStudentId, STUDENT_ID_REFINE_ISSUE);
+export const profileEditSchema = z
+  .object(profileFieldsShape)
+  .refine(refineStudentId, STUDENT_ID_REFINE_ISSUE)
+  .refine(refineGrade, GRADE_REFINE_ISSUE);
 
 export type ProfileEditFormValues = z.infer<typeof profileEditSchema>;
 
