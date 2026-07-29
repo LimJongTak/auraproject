@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UploadCloud, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { subscribeCategories } from "@/lib/firestore/categories";
-import { getTeam, subscribeMyMemberships } from "@/lib/firestore/teams";
+import { createTeam, getTeam, subscribeMyMemberships, TeamError } from "@/lib/firestore/teams";
 import { createDraftExhibition, publishExhibitionPages } from "@/lib/firestore/exhibitions";
 import { renderPdfToImages, validatePdfFile, PdfValidationError, MAX_PDF_PAGES } from "@/lib/pdf/renderPdfToImages";
 import { uploadExhibitionPages } from "@/lib/storage/uploadExhibitionPages";
@@ -59,8 +60,9 @@ function NewExhibitionForm() {
   });
   const projectUrl = watch("projectUrl") ?? "";
   const watchedCategoryId = watch("categoryId");
+  const watchedCategory = categories.find((c) => c.id === watchedCategoryId) ?? null;
   const team = teamsByCategory[watchedCategoryId] ?? null;
-  const teamName = team?.name ?? null;
+  const teamName = team?.name ?? (watchedCategory?.teamSizeMax === 1 ? profile?.name : null) ?? null;
 
   useEffect(() => {
     const unsub = subscribeCategories(setCategories);
@@ -90,7 +92,23 @@ function NewExhibitionForm() {
         (c) =>
           c.isActive &&
           getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "open" &&
-          teamsByCategory[c.id]
+          // A team of exactly one doesn't need to be formed ahead of time — it's
+          // auto-created on submit — so solo categories are always selectable.
+          (teamsByCategory[c.id] || c.teamSizeMax === 1)
+      ),
+    [categories, teamsByCategory]
+  );
+
+  // Open, 2인 이상 대회인데 아직 팀이 없어서 카테고리 목록에 뜨지 않는 대회들 —
+  // 왜 안 보이는지 알 수 있게 따로 안내해요.
+  const missingTeamCategories = useMemo(
+    () =>
+      categories.filter(
+        (c) =>
+          c.isActive &&
+          getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "open" &&
+          c.teamSizeMax !== 1 &&
+          !teamsByCategory[c.id]
       ),
     [categories, teamsByCategory]
   );
@@ -112,14 +130,16 @@ function NewExhibitionForm() {
   }
 
   async function onSubmit(values: ExhibitionMetaValues) {
-    const submittingTeam = teamsByCategory[values.categoryId];
-    if (!submittingTeam) {
-      setError("이 대회에 참가한 팀이 없어요. 먼저 팀을 구성해주세요.");
-      return;
-    }
     const category = categories.find((c) => c.id === values.categoryId);
     if (!category) {
       setError("카테고리를 다시 선택해주세요");
+      return;
+    }
+
+    let submittingTeamId = teamsByCategory[values.categoryId]?.id;
+    let submittingTeamName = teamsByCategory[values.categoryId]?.name;
+    if (!submittingTeamId && category.teamSizeMax !== 1) {
+      setError("이 대회에 참가한 팀이 없어요. 먼저 팀을 구성해주세요.");
       return;
     }
 
@@ -127,6 +147,19 @@ function NewExhibitionForm() {
     try {
       setPhase("creating");
       setProgress(null);
+
+      if (!submittingTeamId) {
+        // Solo category (teamSizeMax === 1): no need to have visited /team first —
+        // provision the 1-member team transparently as part of submitting.
+        try {
+          submittingTeamId = await createTeam(profile!.uid, profile!.name, category.id, category.name);
+          submittingTeamName = profile!.name;
+        } catch (err) {
+          setPhase("error");
+          setError(err instanceof TeamError ? err.message : "참가 처리에 실패했어요");
+          return;
+        }
+      }
 
       let linkPreview = null;
       if (values.projectUrl) {
@@ -149,8 +182,8 @@ function NewExhibitionForm() {
       }
 
       const exhibitionId = await createDraftExhibition({
-        teamId: submittingTeam.id,
-        teamName: submittingTeam.name,
+        teamId: submittingTeamId,
+        teamName: submittingTeamName!,
         categoryId: category.id,
         categoryName: category.name,
         title: values.title,
@@ -193,7 +226,9 @@ function NewExhibitionForm() {
 
   if (!profile || memberships === null) return <CenteredSpinner />;
 
-  if (memberships.length === 0) {
+  // 2인 이상 대회는 먼저 팀을 구성해야 하지만, 1인 대회는 팀 없이도 바로
+  // 신청할 수 있으므로 openCategories가 비어 있을 때만 막아요.
+  if (openCategories.length === 0 && memberships.length === 0) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <p className="font-semibold">팀 구성이 필요해요</p>
@@ -226,8 +261,22 @@ function NewExhibitionForm() {
         </Select>
         {openCategories.length === 0 && (
           <p className="text-xs text-muted">
-            신청 가능한 대회가 없어요. 참가하려는 대회의 팀을 먼저 구성해주세요.
+            신청 가능한 대회가 없어요. 2인 이상 대회는 참가하려는 대회의 팀을 먼저 구성해주세요.
           </p>
+        )}
+
+        {missingTeamCategories.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-semibold">아직 팀을 구성하지 않은 진행 중인 대회가 있어요</p>
+            <ul className="list-inside list-disc">
+              {missingTeamCategories.map((c) => (
+                <li key={c.id}>{c.name}</li>
+              ))}
+            </ul>
+            <Link href="/team" className="self-start font-semibold underline underline-offset-2">
+              팀 구성하러 가기
+            </Link>
+          </div>
         )}
 
         <Input label="제목" placeholder="프로젝트 제목" {...register("title")} error={errors.title?.message} />

@@ -1,6 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { QuickLink, QuickLinkIcon } from "@/types/models";
+import type { QuickLink, QuickLinkContentKey, QuickLinkIcon } from "@/types/models";
 
 const quickLinksRef = () => collection(db, "quickLinks");
 
@@ -15,6 +15,7 @@ export interface QuickLinkInput {
   label: string;
   url: string;
   icon: QuickLinkIcon;
+  contentKey: QuickLinkContentKey | null;
   order: number;
   isActive: boolean;
 }

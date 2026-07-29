@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { useAuth } from "@/hooks/useAuth";
 import { answerInquiry, deleteInquiry, listAllInquiriesForAdmin } from "@/lib/firestore/inquiries";
 import type { Inquiry } from "@/types/models";
 import { Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { Breadcrumb, CenteredSpinner } from "@/components/ui/misc";
+import { CenteredSpinner } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { cn } from "@/lib/utils/cn";
 
 function formatDate(ts: Inquiry["createdAt"] | null): string {
@@ -21,14 +21,6 @@ const STATUS_LABEL: Record<Inquiry["status"], { label: string; className: string
 };
 
 export default function AdminInquiriesPage() {
-  return (
-    <RequireAdmin>
-      <InquiriesManager />
-    </RequireAdmin>
-  );
-}
-
-function InquiriesManager() {
   const { firebaseUser } = useAuth();
   const [inquiries, setInquiries] = useState<Inquiry[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -50,14 +42,13 @@ function InquiriesManager() {
   if (inquiries === null) return <CenteredSpinner />;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "문의 관리" }]} />
-      <h1 className="mt-4 text-2xl font-extrabold">문의 관리</h1>
+    <div className="max-w-3xl">
+      <AdminPageHeader title="문의 관리" />
 
       {inquiries.length === 0 ? (
-        <p className="mt-6 text-sm text-muted">아직 접수된 문의가 없어요.</p>
+        <p className="text-sm text-muted">아직 접수된 문의가 없어요.</p>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
+        <ul className="flex flex-col gap-3">
           {inquiries.map((q) => (
             <li key={q.id} className="rounded-2xl border border-border bg-white p-5">
               <button

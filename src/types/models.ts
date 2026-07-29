@@ -204,6 +204,10 @@ export type QuickLinkIcon =
   | "megaphone"
   | "compass";
 
+// Built-in info card shown in a modal instead of navigating to `url` when
+// set — see src/components/quicklinks for the actual card content per key.
+export type QuickLinkContentKey = "aura-mileage";
+
 // Floating quick-link menu shown on the right edge of the page (desktop
 // only). Public read, admin-managed.
 export interface QuickLink {
@@ -211,6 +215,7 @@ export interface QuickLink {
   label: string;
   url: string;
   icon: QuickLinkIcon;
+  contentKey: QuickLinkContentKey | null;
   order: number;
   isActive: boolean;
   createdAt: Timestamp;

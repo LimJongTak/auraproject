@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { useAuth } from "@/hooks/useAuth";
 import {
   subscribeAnnouncements,
@@ -16,7 +15,8 @@ import { insertAtCursor } from "@/lib/utils/insertAtCursor";
 import type { Announcement } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { Breadcrumb, ErrorText } from "@/components/ui/misc";
+import { ErrorText } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { ImageInsertButton } from "@/components/ui/ImageInsertButton";
 import { stripInlineImages } from "@/components/ui/RichText";
 
@@ -25,14 +25,6 @@ function formatDate(ts: Announcement["createdAt"] | null): string {
 }
 
 export default function AdminNoticesPage() {
-  return (
-    <RequireAdmin>
-      <NoticesManager />
-    </RequireAdmin>
-  );
-}
-
-function NoticesManager() {
   const { firebaseUser } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [editing, setEditing] = useState<Announcement | "new" | null>(null);
@@ -48,14 +40,15 @@ function NoticesManager() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "공지사항 관리" }]} />
-      <div className="mt-4 flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">공지사항 관리</h1>
-        <Button size="sm" onClick={() => setEditing("new")}>
-          <Plus size={16} /> 새 공지
-        </Button>
-      </div>
+    <div className="max-w-3xl">
+      <AdminPageHeader
+        title="공지사항 관리"
+        action={
+          <Button size="sm" onClick={() => setEditing("new")}>
+            <Plus size={16} /> 새 공지
+          </Button>
+        }
+      />
 
       {editing && firebaseUser && (
         <NoticeForm

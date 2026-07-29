@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { listAllExhibitionsForAdmin } from "@/lib/firestore/exhibitions";
 import { listAllTeamsForAdmin } from "@/lib/firestore/teams";
 import { listAllUsers } from "@/lib/firestore/users";
 import type { Category, Exhibition, MemberType, Team, UserProfile } from "@/types/models";
 import { toCsv, downloadCsv } from "@/lib/utils/csv";
-import { Breadcrumb, CenteredSpinner } from "@/components/ui/misc";
+import { CenteredSpinner } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { Button } from "@/components/ui/Button";
 
 interface Applicant {
@@ -23,14 +23,6 @@ interface Applicant {
 }
 
 export default function AdminApplicantsPage() {
-  return (
-    <RequireAdmin>
-      <ApplicantsManager />
-    </RequireAdmin>
-  );
-}
-
-function ApplicantsManager() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [teams, setTeams] = useState<Team[] | null>(null);
@@ -99,14 +91,13 @@ function ApplicantsManager() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "신청자 관리" }]} />
-      <h1 className="mt-4 text-2xl font-extrabold">신청자 관리</h1>
-      <p className="mt-1 text-sm text-muted">
-        대회(카테고리)별로 신청한 학생 명단을 확인하고 CSV로 내려받을 수 있어요.
-      </p>
+    <div>
+      <AdminPageHeader
+        title="신청자 관리"
+        description="대회(카테고리)별로 신청한 학생 명단을 확인하고 CSV로 내려받을 수 있어요."
+      />
 
-      <div className="mt-8 flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
         {categories.map((c) => {
           const applicants = applicantsFor(c.id);
           return (

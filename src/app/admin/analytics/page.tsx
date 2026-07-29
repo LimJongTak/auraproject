@@ -3,25 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import * as XLSX from "xlsx";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { listAllVisitStats } from "@/lib/firestore/visits";
 import { bucketizeVisitStats, PERIOD_LABEL, type VisitBucket, type VisitPeriod } from "@/lib/utils/visitBuckets";
 import type { VisitStat } from "@/types/models";
-import { Breadcrumb, CenteredSpinner } from "@/components/ui/misc";
+import { CenteredSpinner } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 
 const PERIODS: VisitPeriod[] = ["day", "week", "month", "year"];
 
 export default function AdminAnalyticsPage() {
-  return (
-    <RequireAdmin>
-      <AnalyticsManager />
-    </RequireAdmin>
-  );
-}
-
-function AnalyticsManager() {
   const [stats, setStats] = useState<VisitStat[] | null>(null);
   const [period, setPeriod] = useState<VisitPeriod>("day");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -46,16 +38,17 @@ function AnalyticsManager() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "방문자 통계" }]} />
-      <div className="mt-4 flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">방문자 통계</h1>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={!stats || buckets.length === 0}>
-          <Download size={14} /> 엑셀로 출력
-        </Button>
-      </div>
+    <div>
+      <AdminPageHeader
+        title="방문자 통계"
+        action={
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!stats || buckets.length === 0}>
+            <Download size={14} /> 엑셀로 출력
+          </Button>
+        }
+      />
 
-      <div className="mt-6 flex gap-2 rounded-full bg-surface p-1 text-sm">
+      <div className="flex gap-2 rounded-full bg-surface p-1 text-sm">
         {PERIODS.map((p) => (
           <button
             key={p}

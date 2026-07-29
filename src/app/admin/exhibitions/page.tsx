@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EyeOff, Eye } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { listAllExhibitionsForAdmin, setExhibitionStatus } from "@/lib/firestore/exhibitions";
 import type { Exhibition, ExhibitionStatus } from "@/types/models";
-import { Badge, Breadcrumb, CenteredSpinner } from "@/components/ui/misc";
+import { Badge, CenteredSpinner } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { Button } from "@/components/ui/Button";
 
 const STATUS_LABEL: Record<ExhibitionStatus, string> = {
@@ -16,14 +16,6 @@ const STATUS_LABEL: Record<ExhibitionStatus, string> = {
 };
 
 export default function AdminExhibitionsPage() {
-  return (
-    <RequireAdmin>
-      <ExhibitionsManager />
-    </RequireAdmin>
-  );
-}
-
-function ExhibitionsManager() {
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
 
   async function refresh() {
@@ -43,11 +35,10 @@ function ExhibitionsManager() {
   if (!exhibitions) return <CenteredSpinner />;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "게시물 관리" }]} />
-      <h1 className="mt-4 text-2xl font-extrabold">게시물 관리</h1>
+    <div>
+      <AdminPageHeader title="게시물 관리" />
 
-      <ul className="mt-6 flex flex-col gap-3">
+      <ul className="flex flex-col gap-3">
         {exhibitions.map((e) => (
           <li key={e.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4">
             <div className="min-w-0">

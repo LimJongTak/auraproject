@@ -21,6 +21,7 @@ const STATE_LABEL: Record<string, { label: string; className: string }> = {
 
 function formatTeamSize(min: number | undefined, max: number | null | undefined): string {
   const lo = min ?? 1;
+  if (max != null && max === lo) return `${lo}명`;
   return max != null ? `${lo}~${max}명` : `${lo}명 이상`;
 }
 

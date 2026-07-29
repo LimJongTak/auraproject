@@ -16,8 +16,30 @@ const STATE_LABEL: Record<string, { label: string; className: string }> = {
   closed: { label: "접수 마감", className: "bg-surface text-muted" },
 };
 
+// Coarser than STATE_LABEL: contests not yet closed for submissions read as
+// "진행 중" (ongoing) here, since that's the distinction visitors browsing
+// the list actually care about — the before/open nuance still shows via the
+// STATE_LABEL badge next to it.
+type ContestPhase = "ongoing" | "ended";
+
+const PHASE_LABEL: Record<ContestPhase, { label: string; className: string }> = {
+  ongoing: { label: "진행 중", className: "bg-green-50 text-green-600" },
+  ended: { label: "종료", className: "bg-surface text-muted" },
+};
+
+function getContestPhase(c: Category): ContestPhase {
+  return getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed" ? "ended" : "ongoing";
+}
+
+const FILTER_TABS: { key: "all" | ContestPhase; label: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "ongoing", label: "진행 중" },
+  { key: "ended", label: "종료" },
+];
+
 export default function ContestPage() {
   const [categories, setCategories] = useState<Category[] | null>(null);
+  const [filter, setFilter] = useState<"all" | ContestPhase>("all");
 
   useEffect(() => {
     const unsub = subscribeCategories(setCategories);
@@ -25,6 +47,7 @@ export default function ContestPage() {
   }, []);
 
   const active = (categories ?? []).filter((c) => c.isActive);
+  const visible = filter === "all" ? active : active.filter((c) => getContestPhase(c) === filter);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -35,15 +58,31 @@ export default function ContestPage() {
         <p className="mt-1 text-sm text-muted">진행 중인 대회와 접수 기간을 확인하세요.</p>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="mt-6 flex gap-2">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
+              filter === tab.key ? "bg-primary text-white" : "bg-surface text-muted hover:text-foreground"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
         {categories === null &&
           Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="h-40 animate-pulse rounded-2xl bg-surface" />
           ))}
 
         {categories !== null &&
-          active.map((c) => {
+          visible.map((c) => {
             const state = getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt);
+            const phase = getContestPhase(c);
             return (
               <div key={c.id} className="flex flex-col justify-between rounded-2xl border border-border bg-white p-6">
                 <div>
@@ -57,9 +96,14 @@ export default function ContestPage() {
                   )}
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-bold">{c.name}</h3>
-                    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
-                      {STATE_LABEL[state].label}
+                    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", PHASE_LABEL[phase].className)}>
+                      {PHASE_LABEL[phase].label}
                     </span>
+                    {phase === "ongoing" && (
+                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
+                        {STATE_LABEL[state].label}
+                      </span>
+                    )}
                   </div>
                   {c.description && <p className="mt-2 text-sm text-muted">{c.description}</p>}
                   <p className="mt-2 text-xs text-muted">{formatDateRange(c.submissionOpenAt, c.submissionCloseAt)}</p>
@@ -81,8 +125,17 @@ export default function ContestPage() {
           })}
       </div>
 
-      {categories !== null && active.length === 0 && (
-        <EmptyState title="진행 중인 대회가 없어요" description="새로운 대회가 열리면 여기에 표시돼요." />
+      {categories !== null && visible.length === 0 && (
+        <EmptyState
+          title={
+            filter === "ongoing"
+              ? "진행 중인 대회가 없어요"
+              : filter === "ended"
+                ? "종료된 대회가 없어요"
+                : "등록된 대회가 없어요"
+          }
+          description="새로운 대회가 열리면 여기에 표시돼요."
+        />
       )}
     </div>
   );

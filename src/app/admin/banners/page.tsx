@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeCategories, updateCategoryBannerImage, updateCategoryThemeReveal } from "@/lib/firestore/categories";
 import { subscribeBannerTheme, setBannerTheme, deleteBannerTheme } from "@/lib/firestore/bannerThemes";
@@ -11,7 +10,8 @@ import { formatDateRange } from "@/lib/utils/dateWindow";
 import type { BannerTheme, Category } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { Breadcrumb, ErrorText } from "@/components/ui/misc";
+import { ErrorText } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 
 function toLocalInputValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -19,14 +19,6 @@ function toLocalInputValue(date: Date): string {
 }
 
 export default function AdminBannersPage() {
-  return (
-    <RequireAdmin>
-      <BannersManager />
-    </RequireAdmin>
-  );
-}
-
-function BannersManager() {
   const { firebaseUser } = useAuth();
   const [categories, setCategories] = useState<Category[] | null>(null);
 
@@ -36,13 +28,11 @@ function BannersManager() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "배너 관리" }]} />
-      <h1 className="mt-4 text-2xl font-extrabold">배너 관리</h1>
-      <p className="mt-1 text-sm text-muted">
-        배너 이미지를 등록한 대회만 메인 화면 상단에 노출돼요. 신청 시작 카운트다운은 카테고리 관리에서 설정한
-        게시 시작 시각을 그대로 사용해요.
-      </p>
+    <div className="max-w-3xl">
+      <AdminPageHeader
+        title="배너 관리"
+        description="배너 이미지를 등록한 대회만 메인 화면 상단에 노출돼요. 신청 시작 카운트다운은 카테고리 관리에서 설정한 게시 시작 시각을 그대로 사용해요."
+      />
 
       {categories === null && <p className="mt-8 text-sm text-muted">불러오는 중...</p>}
       {categories !== null && categories.length === 0 && (

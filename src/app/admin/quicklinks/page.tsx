@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import {
   createQuickLink,
   deleteQuickLink,
@@ -12,21 +11,14 @@ import {
   type QuickLinkInput,
 } from "@/lib/firestore/quickLinks";
 import { DEFAULT_QUICK_LINK_ICON, QUICK_LINK_ICONS } from "@/lib/constants/quickLinkIcons";
-import type { QuickLink, QuickLinkIcon } from "@/types/models";
+import type { QuickLink, QuickLinkContentKey, QuickLinkIcon } from "@/types/models";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { Breadcrumb, ErrorText } from "@/components/ui/misc";
+import { ErrorText } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { cn } from "@/lib/utils/cn";
 
 export default function AdminQuickLinksPage() {
-  return (
-    <RequireAdmin>
-      <QuickLinksManager />
-    </RequireAdmin>
-  );
-}
-
-function QuickLinksManager() {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [editing, setEditing] = useState<QuickLink | "new" | null>(null);
 
@@ -51,19 +43,16 @@ function QuickLinksManager() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "퀵메뉴 관리" }]} />
-      <div className="mt-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold">퀵메뉴 관리</h1>
-          <p className="mt-1 text-sm text-muted">
-            화면 오른쪽에 떠있는 바로가기 버튼이에요 (PC 화면에서만 보여요).
-          </p>
-        </div>
-        <Button size="sm" onClick={() => setEditing("new")}>
-          <Plus size={16} /> 새 버튼
-        </Button>
-      </div>
+    <div className="max-w-2xl">
+      <AdminPageHeader
+        title="퀵메뉴 관리"
+        description="화면 오른쪽에 떠있는 바로가기 버튼이에요 (PC 화면에서만 보여요)."
+        action={
+          <Button size="sm" onClick={() => setEditing("new")}>
+            <Plus size={16} /> 새 버튼
+          </Button>
+        }
+      />
 
       {editing && (
         <QuickLinkForm
@@ -85,18 +74,27 @@ function QuickLinksManager() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-bold">{link.label}</p>
+                    {link.contentKey && (
+                      <span className="rounded-full bg-primary-light px-2 py-0.5 text-xs font-semibold text-primary-dark">
+                        안내 카드
+                      </span>
+                    )}
                     {!link.isActive && (
                       <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-muted">비활성</span>
                     )}
                   </div>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 truncate text-xs text-muted hover:text-primary"
-                  >
-                    {link.url} <ExternalLink size={11} className="shrink-0" />
-                  </a>
+                  {link.url ? (
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 truncate text-xs text-muted hover:text-primary"
+                    >
+                      {link.url} <ExternalLink size={11} className="shrink-0" />
+                    </a>
+                  ) : (
+                    <p className="text-xs text-muted">연결 URL 없음</p>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -144,6 +142,7 @@ function QuickLinkForm({
   const [label, setLabel] = useState(initial?.label ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [icon, setIcon] = useState<QuickLinkIcon>(initial?.icon ?? DEFAULT_QUICK_LINK_ICON);
+  const [contentKey, setContentKey] = useState<QuickLinkContentKey | null>(initial?.contentKey ?? null);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -155,12 +154,16 @@ function QuickLinkForm({
       return;
     }
     let normalizedUrl = url.trim();
-    if (!/^https?:\/\//.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
-    try {
-      new URL(normalizedUrl);
-    } catch {
-      setError("올바른 URL을 입력해주세요");
-      return;
+    // Info-card buttons don't navigate anywhere, so the URL is only used for
+    // an optional "바로가기" link inside the card — leaving it blank is fine.
+    if (normalizedUrl || !contentKey) {
+      if (!/^https?:\/\//.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+      try {
+        new URL(normalizedUrl);
+      } catch {
+        setError("올바른 URL을 입력해주세요");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -169,6 +172,7 @@ function QuickLinkForm({
       label: label.trim(),
       url: normalizedUrl,
       icon,
+      contentKey,
       order: initial?.order ?? nextOrder,
       isActive,
     };
@@ -190,7 +194,7 @@ function QuickLinkForm({
     <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-white p-5">
       <Input label="버튼 이름" placeholder="예: 전자책" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={20} />
       <Input
-        label="연결 URL"
+        label={contentKey ? "연결 URL (안내 카드의 \"바로가기\" 버튼에 사용돼요)" : "연결 URL"}
         placeholder="https://example.com"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
@@ -218,6 +222,14 @@ function QuickLinkForm({
           )}
         </div>
       </div>
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={contentKey === "aura-mileage"}
+          onChange={(e) => setContentKey(e.target.checked ? "aura-mileage" : null)}
+        />
+        클릭 시 링크 이동 대신 AURA 마일리지 안내 카드를 표시
+      </label>
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
         화면에 노출

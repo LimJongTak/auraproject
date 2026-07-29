@@ -113,9 +113,24 @@ function CategoryTeamSection({
         </div>
       ) : team ? (
         <MyTeam team={team} uid={uid} />
+      ) : category.teamSizeMax === 1 ? (
+        <SoloCategoryNotice categoryId={category.id} />
       ) : (
         <TeamOnboarding categoryId={category.id} categoryName={category.name} uid={uid} />
       )}
+    </div>
+  );
+}
+
+function SoloCategoryNotice({ categoryId }: { categoryId: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center">
+      <p className="text-sm text-muted">1인 참가 대회예요. 팀을 만들 필요 없이 전시물을 등록하면 바로 참가돼요.</p>
+      <Link href={`/exhibitions/new?categoryId=${categoryId}`}>
+        <Button size="sm">
+          <Plus size={14} /> 전시물 등록하러 가기
+        </Button>
+      </Link>
     </div>
   );
 }

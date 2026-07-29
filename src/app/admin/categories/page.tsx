@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Pencil, Plus, Trash2, Unlock } from "lucide-react";
-import { RequireAdmin } from "@/components/auth/Guard";
 import { subscribeCategories, createCategory, updateCategory, deleteCategory, type CategoryInput } from "@/lib/firestore/categories";
 import { listEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
@@ -12,7 +11,8 @@ import { DEFAULT_RUBRIC } from "@/lib/constants/defaultRubric";
 import type { Category, RubricItem } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { Breadcrumb, ErrorText } from "@/components/ui/misc";
+import { ErrorText } from "@/components/ui/misc";
+import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { ImageInsertButton } from "@/components/ui/ImageInsertButton";
 import { cn } from "@/lib/utils/cn";
 
@@ -23,6 +23,7 @@ function toLocalInputValue(date: Date): string {
 
 function formatTeamSize(min: number | undefined, max: number | null | undefined): string {
   const lo = min ?? 1;
+  if (max != null && max === lo) return `${lo}명`;
   return max != null ? `${lo}~${max}명` : `${lo}명 이상`;
 }
 
@@ -33,14 +34,6 @@ const STATE_LABEL: Record<string, { label: string; className: string }> = {
 };
 
 export default function AdminCategoriesPage() {
-  return (
-    <RequireAdmin>
-      <CategoriesManager />
-    </RequireAdmin>
-  );
-}
-
-function CategoriesManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [editing, setEditing] = useState<Category | "new" | null>(null);
 
@@ -55,14 +48,15 @@ function CategoriesManager() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <Breadcrumb items={[{ label: "관리자", href: "/admin" }, { label: "카테고리 관리" }]} />
-      <div className="mt-4 flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">카테고리 관리</h1>
-        <Button size="sm" onClick={() => setEditing("new")}>
-          <Plus size={16} /> 새 카테고리
-        </Button>
-      </div>
+    <div className="max-w-3xl">
+      <AdminPageHeader
+        title="카테고리 관리"
+        action={
+          <Button size="sm" onClick={() => setEditing("new")}>
+            <Plus size={16} /> 새 카테고리
+          </Button>
+        }
+      />
 
       {editing && (
         <CategoryForm
