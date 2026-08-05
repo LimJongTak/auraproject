@@ -36,7 +36,7 @@ export function ImageInsertButton({
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        title="JPG, PNG, WebP 등 이미지 파일 (최대 5MB) · 권장 규격 1200×675px (16:9 가로형)"
+        title="JPG, PNG, WebP 등 이미지 파일 (최대 5MB) · 일반 이미지 1200×675px(16:9) 또는 포스터 842×1191px(A3 세로형) 추천"
         className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
       >
         <ImagePlus size={14} /> {uploading ? "업로드 중..." : "본문에 이미지 삽입 (최대 5MB)"}

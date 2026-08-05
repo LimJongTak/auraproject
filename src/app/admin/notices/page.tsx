@@ -153,7 +153,8 @@ function NoticeForm({
         </div>
         <Textarea ref={contentRef} value={content} onChange={(e) => setContent(e.target.value)} className="min-h-40" />
         <span className="text-xs text-muted">
-          이미지를 삽입하면 본문에 자동으로 링크가 추가돼요. JPG, PNG, WebP 등 (최대 5MB) · 권장 규격 1200×675px (16:9 가로형)
+          이미지를 삽입하면 본문에 자동으로 링크가 추가돼요. JPG, PNG, WebP 등 (최대 5MB) · 일반 이미지는 1200×675px(16:9
+          가로형), 포스터는 842×1191px(A3 세로형)를 추천해요 — 세로 이미지는 잘리지 않고 그대로 표시돼요.
         </span>
       </div>
       <div className="flex flex-col gap-2">

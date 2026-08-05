@@ -20,8 +20,18 @@ export function RichText({ content, className }: { content: string; className?: 
       nodes.push(<span key={key++}>{content.slice(lastIndex, match.index)}</span>);
     }
     nodes.push(
+      // No fixed aspect ratio here on purpose — inline images range from wide
+      // 16:9 photos to full A3-poster (842x1191) uploads, and this has to
+      // display both without cropping. Bounding by max-height keeps a tall
+      // poster from forcing a huge scroll; w-auto + max-w-full keeps a wide
+      // image at its natural size up to the column width.
       // eslint-disable-next-line @next/next/no-img-element
-      <img key={key++} src={match[1]} alt="" className="my-3 w-full rounded-2xl object-cover" />
+      <img
+        key={key++}
+        src={match[1]}
+        alt=""
+        className="mx-auto my-4 block h-auto max-h-[80vh] w-auto max-w-full rounded-2xl shadow-md"
+      />
     );
     lastIndex = re.lastIndex;
   }
