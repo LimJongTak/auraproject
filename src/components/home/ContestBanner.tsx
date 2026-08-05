@@ -79,11 +79,11 @@ export function ContestBanner({ category }: { category: Category }) {
 
   return (
     <section
-      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-foreground via-foreground to-primary-dark bg-cover bg-center py-14 text-white"
+      className="relative flex items-center overflow-hidden rounded-3xl bg-gradient-to-br from-foreground via-foreground to-primary-dark bg-cover bg-center py-14 text-white sm:aspect-[8/3] sm:py-0"
       style={category.bannerImageUrl ? { backgroundImage: `url(${category.bannerImageUrl})` } : undefined}
     >
-      {category.bannerImageUrl && <div className="absolute inset-0 bg-black/55" />}
-      <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-8 px-4 text-center sm:flex-row sm:items-center sm:justify-around sm:gap-4">
+      {category.bannerImageUrl && <div className="absolute inset-0 bg-black/30" />}
+      <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-8 px-4 text-center sm:flex-row sm:items-center sm:justify-around sm:gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-primary">{category.name}</p>
           <AnimatePresence mode="wait">
