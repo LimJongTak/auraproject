@@ -5,6 +5,7 @@
 
 ## 도메인 주소
 - [AURA 대회 플랫폼](https://scnuai.com)
+
 ## 주요 기능
 
 - **회원가입 / 로그인** — 이름·학교·학과·학년·학번 정보로 가입 (Firebase Authentication)
