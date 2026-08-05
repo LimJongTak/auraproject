@@ -52,17 +52,22 @@ export default function ContestDetailPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "대회", href: "/contest" }, { label: category.name }]} />
 
-      {category.bannerImageUrl && (
+      {category.thumbnailUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={category.bannerImageUrl}
+          src={category.thumbnailUrl}
           alt={category.name}
-          className="mt-4 h-56 w-full rounded-2xl object-cover sm:h-72"
+          className="mt-4 aspect-[2/1] w-full rounded-2xl object-cover"
         />
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <h1 className="text-3xl font-extrabold">{category.name}</h1>
+        {category.contestType && (
+          <span className="rounded-full bg-primary-light px-2.5 py-1 text-xs font-semibold text-primary-dark">
+            {category.contestType}
+          </span>
+        )}
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", STATE_LABEL[windowState].className)}>
           {STATE_LABEL[windowState].label}
         </span>

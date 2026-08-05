@@ -8,8 +8,8 @@ import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
 import { insertAtCursor } from "@/lib/utils/insertAtCursor";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
 import { DEFAULT_RUBRIC } from "@/lib/constants/defaultRubric";
-import type { Category, RubricItem } from "@/types/models";
-import { Input, Textarea } from "@/components/ui/Field";
+import { CONTEST_TYPES, type Category, type ContestType, type RubricItem } from "@/types/models";
+import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
@@ -78,8 +78,13 @@ export default function AdminCategoriesPage() {
                     <img src={c.bannerImageUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
                   )}
                   <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold">{c.name}</p>
+                    {c.contestType && (
+                      <span className="rounded-full bg-primary-light px-2 py-0.5 text-xs font-semibold text-primary-dark">
+                        {c.contestType}
+                      </span>
+                    )}
                     <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
                       {STATE_LABEL[state].label}
                     </span>
@@ -119,6 +124,7 @@ function CategoryForm({
   onDone: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
+  const [contestType, setContestType] = useState<ContestType>(initial?.contestType ?? CONTEST_TYPES[0]);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [detailContent, setDetailContent] = useState(initial?.detailContent ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
@@ -230,6 +236,7 @@ function CategoryForm({
     setError(null);
     const input: CategoryInput = {
       name: name.trim(),
+      contestType,
       description: description.trim() || null,
       detailContent: detailContent.trim() || null,
       order: initial?.order ?? nextOrder,
@@ -260,6 +267,17 @@ function CategoryForm({
   return (
     <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-white p-5">
       <Input label="카테고리 이름" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+      <Select
+        label="카테고리 구분"
+        value={contestType}
+        onChange={(e) => setContestType(e.target.value as ContestType)}
+      >
+        {CONTEST_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </Select>
       <Textarea
         label="설명 (선택, 짧게 — 목록·배너에 표시)"
         value={description ?? ""}

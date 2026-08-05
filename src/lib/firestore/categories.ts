@@ -12,7 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Category, RubricItem } from "@/types/models";
+import type { Category, ContestType, RubricItem } from "@/types/models";
 
 const categoriesRef = () => collection(db, "categories");
 
@@ -30,6 +30,7 @@ export async function getCategory(id: string): Promise<Category | null> {
 
 export interface CategoryInput {
   name: string;
+  contestType: ContestType;
   description: string | null;
   detailContent: string | null;
   order: number;
@@ -47,6 +48,7 @@ export interface CategoryInput {
 export async function createCategory(input: CategoryInput) {
   await addDoc(categoriesRef(), {
     name: input.name,
+    contestType: input.contestType,
     description: input.description,
     detailContent: input.detailContent,
     order: input.order,
@@ -68,6 +70,7 @@ export async function createCategory(input: CategoryInput) {
 export async function updateCategory(id: string, input: CategoryInput) {
   await updateDoc(doc(db, "categories", id), {
     name: input.name,
+    contestType: input.contestType,
     description: input.description,
     detailContent: input.detailContent,
     order: input.order,

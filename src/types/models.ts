@@ -38,9 +38,13 @@ export interface TeamMembership {
   createdAt: Timestamp;
 }
 
+export const CONTEST_TYPES = ["바이브코딩", "경진대회", "해커톤", "아이디어톤", "공모전"] as const;
+export type ContestType = (typeof CONTEST_TYPES)[number];
+
 export interface Category {
   id: string;
   name: string;
+  contestType: ContestType;
   description: string | null;
   // Longer free-text body for the contest detail page (/contest/[id]),
   // separate from the short `description` used in listings/banners.

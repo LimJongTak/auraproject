@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
-import type { Category } from "@/types/models";
+import { CONTEST_TYPES, type Category, type ContestType } from "@/types/models";
 import { Breadcrumb, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
@@ -40,6 +40,7 @@ const FILTER_TABS: { key: "all" | ContestPhase; label: string }[] = [
 export default function ContestPage() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [filter, setFilter] = useState<"all" | ContestPhase>("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | ContestType>("all");
 
   useEffect(() => {
     const unsub = subscribeCategories(setCategories);
@@ -47,7 +48,8 @@ export default function ContestPage() {
   }, []);
 
   const active = (categories ?? []).filter((c) => c.isActive);
-  const visible = filter === "all" ? active : active.filter((c) => getContestPhase(c) === filter);
+  const phaseFiltered = filter === "all" ? active : active.filter((c) => getContestPhase(c) === filter);
+  const visible = typeFilter === "all" ? phaseFiltered : phaseFiltered.filter((c) => c.contestType === typeFilter);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -58,7 +60,7 @@ export default function ContestPage() {
         <p className="mt-1 text-sm text-muted">진행 중인 대회와 접수 기간을 확인하세요.</p>
       </div>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -69,6 +71,34 @@ export default function ContestPage() {
             )}
           >
             {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setTypeFilter("all")}
+          className={cn(
+            "rounded-full border px-3.5 py-1 text-xs font-semibold transition-colors",
+            typeFilter === "all"
+              ? "border-primary bg-primary-light text-primary-dark"
+              : "border-border text-muted hover:border-primary/40 hover:text-foreground"
+          )}
+        >
+          전체 카테고리
+        </button>
+        {CONTEST_TYPES.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTypeFilter(t)}
+            className={cn(
+              "rounded-full border px-3.5 py-1 text-xs font-semibold transition-colors",
+              typeFilter === t
+                ? "border-primary bg-primary-light text-primary-dark"
+                : "border-border text-muted hover:border-primary/40 hover:text-foreground"
+            )}
+          >
+            {t}
           </button>
         ))}
       </div>
@@ -91,11 +121,16 @@ export default function ContestPage() {
                     <img
                       src={c.thumbnailUrl}
                       alt={c.name}
-                      className="mb-4 h-36 w-full rounded-xl object-cover"
+                      className="mb-4 aspect-[2/1] w-full rounded-xl object-cover"
                     />
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xl font-bold">{c.name}</h3>
+                    {c.contestType && (
+                      <span className="rounded-full bg-primary-light px-2 py-0.5 text-xs font-semibold text-primary-dark">
+                        {c.contestType}
+                      </span>
+                    )}
                     <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", PHASE_LABEL[phase].className)}>
                       {PHASE_LABEL[phase].label}
                     </span>
