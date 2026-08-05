@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 import { toKoreanAuthError } from "@/lib/firebase/errors";
 import { SCHOOL_OPTIONS, signupSchema, type SignupFormValues } from "@/lib/validation/authSchemas";
@@ -39,6 +39,12 @@ export default function SignupPage() {
   async function onSubmit(values: SignupFormValues) {
     setSubmitError(null);
     try {
+      const existing = await getDoc(doc(db, "studentIdIndex", values.studentId));
+      if (existing.exists()) {
+        setSubmitError("이미 사용 중인 학번/사번이에요");
+        return;
+      }
+
       const credential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(credential.user, { displayName: values.name });
       await setDoc(doc(db, "users", credential.user.uid), {
@@ -53,6 +59,22 @@ export default function SignupPage() {
         role: "user",
         createdAt: serverTimestamp(),
       });
+
+      try {
+        await setDoc(doc(db, "studentIdIndex", values.studentId), {
+          uid: credential.user.uid,
+          email: values.email,
+        });
+      } catch {
+        // Lost a uniqueness race against another signup — roll back the
+        // account we just created rather than leaving an orphaned user with
+        // no way to log in via studentId.
+        await deleteDoc(doc(db, "users", credential.user.uid));
+        await credential.user.delete();
+        setSubmitError("이미 사용 중인 학번/사번이에요");
+        return;
+      }
+
       router.push("/");
     } catch (error) {
       setSubmitError(toKoreanAuthError(error));

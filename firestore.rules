@@ -27,6 +27,23 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------------- studentId -> email index (login lookup) ----------------
+    // Doc ID == studentId/employeeId. Must be publicly readable so the login
+    // form can resolve it to an email *before* the user is authenticated
+    // (Firebase Auth sign-in always needs an email). Uniqueness is enforced
+    // implicitly: once a doc exists, only "update" rules apply to further
+    // writes (Firestore rules distinguish create/update by prior existence),
+    // and update is admin-only — so a second signup/rename can't overwrite it.
+    match /studentIdIndex/{studentId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.keys().hasOnly(['uid', 'email']);
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
     // ---------------- teams (doc ID == invite code) ----------------
     // Teams now belong to exactly one contest (categoryId). "At most one team
     // per contest per user" is enforced by teamMemberships/{uid}_{categoryId}

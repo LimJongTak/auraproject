@@ -101,7 +101,7 @@ export function ProfileFields({ values, onChange, errors }: ProfileFieldsProps) 
         </div>
       ) : (
         <Input
-          label="사번 (선택)"
+          label="사번"
           placeholder="자유 입력"
           value={values.studentId}
           onChange={(e) => onChange("studentId", e.target.value)}

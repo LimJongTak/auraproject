@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
 import { toKoreanAuthError } from "@/lib/firebase/errors";
 import { loginSchema, type LoginFormValues } from "@/lib/validation/authSchemas";
 import { Input } from "@/components/ui/Field";
@@ -25,7 +26,13 @@ export default function LoginPage() {
   async function onSubmit(values: LoginFormValues) {
     setSubmitError(null);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const indexSnap = await getDoc(doc(db, "studentIdIndex", values.studentId));
+      if (!indexSnap.exists()) {
+        setSubmitError("학번/사번 또는 비밀번호가 올바르지 않아요");
+        return;
+      }
+      const { email } = indexSnap.data() as { email: string };
+      await signInWithEmailAndPassword(auth, email, values.password);
       router.push("/");
     } catch (error) {
       setSubmitError(toKoreanAuthError(error));
@@ -41,11 +48,11 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <Input
-          label="이메일"
-          type="email"
-          placeholder="you@example.com"
-          {...register("email")}
-          error={errors.email?.message}
+          label="학번/사번"
+          type="text"
+          placeholder="학번 또는 사번을 입력해주세요"
+          {...register("studentId")}
+          error={errors.studentId?.message}
         />
         <Input
           label="비밀번호"

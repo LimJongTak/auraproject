@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { User, Heart, MessageCircle, Plus, ArrowRight, Trophy, Pencil, KeyRound, X } from "lucide-react";
+import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
@@ -256,7 +258,31 @@ function ProfileEditFields({ profile }: { profile: UserProfile }) {
     setSubmitError(null);
     setSuccess(false);
     try {
+      const studentIdChanged = values.studentId !== profile.studentId;
+
+      if (studentIdChanged) {
+        const existing = await getDoc(doc(db, "studentIdIndex", values.studentId));
+        if (existing.exists()) {
+          setSubmitError("이미 사용 중인 학번/사번이에요");
+          return;
+        }
+        // Create the new index entry before touching the profile doc, so a
+        // lost uniqueness race leaves nothing changed instead of a stale
+        // profile pointing at an index entry someone else grabbed first.
+        try {
+          await setDoc(doc(db, "studentIdIndex", values.studentId), { uid: profile.uid, email: profile.email });
+        } catch {
+          setSubmitError("이미 사용 중인 학번/사번이에요");
+          return;
+        }
+      }
+
       await updateMyProfile(profile.uid, values);
+
+      if (studentIdChanged && profile.studentId) {
+        await deleteDoc(doc(db, "studentIdIndex", profile.studentId));
+      }
+
       setSuccess(true);
     } catch {
       setSubmitError("저장에 실패했어요");

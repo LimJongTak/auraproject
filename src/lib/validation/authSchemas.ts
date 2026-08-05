@@ -27,14 +27,14 @@ export const profileFieldsShape = {
   studentId: z.string().max(20),
 };
 
-export function refineStudentId(data: { memberType: string; studentId: string }): boolean {
-  return data.memberType !== "student" || /^\d{8}$/.test(data.studentId);
+// studentId doubles as the login ID for both member types, so it's required
+// either way: 8-digit numeric for students, free-form non-empty for staff.
+export function studentIdIssue(data: { memberType: string; studentId: string }): { message: string; path: ["studentId"] } | null {
+  if (data.memberType === "student") {
+    return /^\d{8}$/.test(data.studentId) ? null : { message: "학번은 숫자 8자리로 입력해주세요", path: ["studentId"] };
+  }
+  return data.studentId.trim().length > 0 ? null : { message: "사번을 입력해주세요", path: ["studentId"] };
 }
-
-export const STUDENT_ID_REFINE_ISSUE: { message: string; path: [string] } = {
-  message: "학번은 숫자 8자리로 입력해주세요",
-  path: ["studentId"],
-};
 
 export function refineGrade(data: { memberType: string; grade: string }): boolean {
   return data.memberType !== "student" || data.grade.length > 0;
@@ -61,20 +61,26 @@ export const signupSchema = z
     message: "비밀번호가 일치하지 않아요",
     path: ["passwordConfirm"],
   })
-  .refine(refineStudentId, STUDENT_ID_REFINE_ISSUE)
+  .superRefine((data, ctx) => {
+    const issue = studentIdIssue(data);
+    if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, ...issue });
+  })
   .refine(refineGrade, GRADE_REFINE_ISSUE);
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const profileEditSchema = z
   .object(profileFieldsShape)
-  .refine(refineStudentId, STUDENT_ID_REFINE_ISSUE)
+  .superRefine((data, ctx) => {
+    const issue = studentIdIssue(data);
+    if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, ...issue });
+  })
   .refine(refineGrade, GRADE_REFINE_ISSUE);
 
 export type ProfileEditFormValues = z.infer<typeof profileEditSchema>;
 
 export const loginSchema = z.object({
-  email: z.string().min(1, "이메일을 입력해주세요").email("올바른 이메일 형식이 아니에요"),
+  studentId: z.string().min(1, "학번/사번을 입력해주세요"),
   password: z.string().min(1, "비밀번호를 입력해주세요"),
 });
 

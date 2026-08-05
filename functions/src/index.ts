@@ -74,3 +74,43 @@ export const adminWithdrawUser = onCall(async (request) => {
 
   return { ok: true };
 });
+
+// One-off/idempotent migration: populates studentIdIndex/{studentId} -> {uid, email}
+// from existing users docs, for accounts created before login-by-studentId existed.
+// Safe to call more than once — already-indexed or colliding studentIds are skipped.
+export const backfillStudentIdIndex = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError("unauthenticated", "로그인이 필요해요");
+
+  const db = getFirestore();
+
+  const callerSnap = await db.doc(`users/${callerUid}`).get();
+  if (callerSnap.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "관리자만 사용할 수 있어요");
+  }
+
+  const usersSnap = await db.collection("users").get();
+  let created = 0;
+  const skipped: string[] = [];
+
+  for (const userDoc of usersSnap.docs) {
+    const data = userDoc.data() as { studentId?: string; email?: string };
+    const studentId = data.studentId?.trim();
+    if (!studentId || !data.email) {
+      skipped.push(userDoc.id);
+      continue;
+    }
+
+    const indexRef = db.doc(`studentIdIndex/${studentId}`);
+    const indexSnap = await indexRef.get();
+    if (indexSnap.exists) {
+      if (indexSnap.data()?.uid !== userDoc.id) skipped.push(userDoc.id);
+      continue;
+    }
+
+    await indexRef.set({ uid: userDoc.id, email: data.email });
+    created++;
+  }
+
+  return { created, skipped };
+});
