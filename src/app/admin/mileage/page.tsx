@@ -20,6 +20,14 @@ interface StudentAggregate {
   grants: MileageGrant[];
 }
 
+// studentName/studentIdNumber come from user-editable profile fields (name,
+// staff's free-text 사번), not admin-authored text. Neutralize leading
+// =/+/-/@ so Excel can't interpret a crafted value as a formula when the
+// admin opens the exported file (CSV/Excel formula injection).
+function excelSafe(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 export default function AdminMileagePage() {
   const [grants, setGrants] = useState<MileageGrant[] | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<string>("all");
@@ -66,12 +74,14 @@ export default function AdminMileagePage() {
   function handleExport() {
     const scopeLabel = semesterFilter === "all" ? "전체" : semesterLabel(semesterFilter);
     const rows = filteredStudents.map((s) => ({
-      이름: s.studentName,
-      학번: s.studentIdNumber,
+      이름: excelSafe(s.studentName),
+      학번: excelSafe(s.studentIdNumber),
       "마일리지 총점": s.total,
-      획득내역: s.grants
-        .map((g) => `[${semesterLabel(g.semester)}] ${g.title} (${g.amount >= 0 ? "+" : ""}${g.amount})`)
-        .join("\n"),
+      획득내역: excelSafe(
+        s.grants
+          .map((g) => `[${semesterLabel(g.semester)}] ${g.title} (${g.amount >= 0 ? "+" : ""}${g.amount})`)
+          .join("\n")
+      ),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 50 }];

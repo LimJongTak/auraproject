@@ -28,14 +28,19 @@ service cloud.firestore {
     }
 
     // ---------------- studentId -> email index (login lookup) ----------------
-    // Doc ID == studentId/employeeId. Must be publicly readable so the login
-    // form can resolve it to an email *before* the user is authenticated
-    // (Firebase Auth sign-in always needs an email). Uniqueness is enforced
-    // implicitly: once a doc exists, only "update" rules apply to further
-    // writes (Firestore rules distinguish create/update by prior existence),
-    // and update is admin-only — so a second signup/rename can't overwrite it.
+    // Doc ID == studentId/employeeId. `get` (by a specific, already-known
+    // studentId) must be publicly readable so the login form can resolve it
+    // to an email *before* the user is authenticated. `list` is intentionally
+    // NOT public — the app only ever does single-doc `getDoc` lookups here
+    // (never a collection query), so allowing `list` would let anyone
+    // unauthenticated dump every studentId -> {uid, email} mapping in one
+    // request. Uniqueness is enforced implicitly: once a doc exists, only
+    // "update" rules apply to further writes (Firestore rules distinguish
+    // create/update by prior existence), and update is admin-only — so a
+    // second signup/rename can't overwrite it.
     match /studentIdIndex/{studentId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isAdmin();
       allow create: if isSignedIn()
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.email == request.auth.token.email
