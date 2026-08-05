@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 const AURA_LETTERS = [
@@ -125,6 +125,14 @@ export function AuraMileageInfoModal({ url, onClose }: { url?: string; onClose: 
                   확인할 수 있습니다.
                 </li>
               </ol>
+              <a
+                href="https://m.site.naver.com/2diJK"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary-light px-4 py-2.5 text-sm font-semibold text-primary-dark transition hover:bg-primary/20"
+              >
+                <ExternalLink size={15} /> 마일리지 신청 페이지 바로가기
+              </a>
             </Section>
 
             <Section title="신청 시 꼭 확인하세요">
