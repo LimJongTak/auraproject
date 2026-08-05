@@ -78,7 +78,7 @@ service cloud.firestore {
     // ---------------- team memberships (doc ID == `${uid}_${categoryId}`) ----------------
     match /teamMemberships/{membershipId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && membershipId == request.auth.uid + '_' + request.resource.data.categoryId;
@@ -130,6 +130,18 @@ service cloud.firestore {
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'answer', 'answeredAt', 'answeredBy'])
         && request.resource.data.status == 'answered';
+      allow delete: if isAdmin();
+    }
+
+    // ---------------- mileage grants (admin -> student ledger) ----------------
+    // Unlike inquiries, students never create their own grant docs — only an
+    // admin can create/update/delete. get/list stay owner-or-admin so a
+    // student's own MyPage mileage tab can query where('uid','==', myUid).
+    match /mileageGrants/{grantId} {
+      allow get: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 

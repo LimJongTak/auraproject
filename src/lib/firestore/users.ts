@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { UserProfile, UserRole } from "@/types/models";
 
@@ -6,6 +6,11 @@ export async function listAllUsers(): Promise<UserProfile[]> {
   const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile));
+}
+
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? ({ uid: snap.id, ...snap.data() } as UserProfile) : null;
 }
 
 export async function setUserRole(uid: string, role: UserRole): Promise<void> {

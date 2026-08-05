@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCheck, ShieldCheck, ShieldOff, UserX } from "lucide-react";
+import Link from "next/link";
+import { ClipboardCheck, Eye, ShieldCheck, ShieldOff, UserX } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { listAllUsers, setUserRole } from "@/lib/firestore/users";
 import { adminWithdrawUser } from "@/lib/functions/adminWithdrawUser";
@@ -197,6 +198,11 @@ export default function AdminUsersPage() {
               <p className="text-sm text-muted">{formatUserMeta(user)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Link href={`/admin/users/${user.uid}`}>
+                <Button variant="outline" size="sm">
+                  <Eye size={14} /> 상세
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="sm"

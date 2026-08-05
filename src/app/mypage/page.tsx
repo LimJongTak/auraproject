@@ -1,90 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Heart, MessageCircle, Plus, ArrowRight, Trophy, Pencil, KeyRound, X } from "lucide-react";
+import { User, Pencil, KeyRound, X } from "lucide-react";
 import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { RequireAuth } from "@/components/auth/Guard";
-import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
-import { getTeam, subscribeMyMemberships } from "@/lib/firestore/teams";
-import { subscribeMyInquiries } from "@/lib/firestore/inquiries";
 import { changePassword } from "@/lib/auth/changePassword";
 import { toKoreanAuthError } from "@/lib/firebase/errors";
 import { changePasswordSchema, profileEditSchema, type ChangePasswordFormValues, type ProfileEditFormValues } from "@/lib/validation/authSchemas";
 import { updateMyProfile } from "@/lib/firestore/users";
-import type { Exhibition, ExhibitionStatus, Inquiry, Team, TeamMembership, UserProfile } from "@/types/models";
-import { Badge, CenteredSpinner, ErrorText } from "@/components/ui/misc";
+import type { UserProfile } from "@/types/models";
+import { CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { ProfileFields } from "@/components/profile/ProfileFields";
 import type { User as FirebaseUser } from "firebase/auth";
-import { cn } from "@/lib/utils/cn";
-
-const STATUS_LABEL: Record<ExhibitionStatus, string> = {
-  draft: "임시저장",
-  published: "게시중",
-  hidden: "숨김",
-};
-
-const INQUIRY_STATUS_LABEL: Record<Inquiry["status"], { label: string; className: string }> = {
-  pending: { label: "대기중", className: "bg-surface text-muted" },
-  answered: { label: "답변완료", className: "bg-primary-light text-primary-dark" },
-};
 
 export default function MyPage() {
-  return (
-    <RequireAuth>
-      <MyPageContent />
-    </RequireAuth>
-  );
-}
-
-function MyPageContent() {
   const { firebaseUser, profile } = useAuth();
-  const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
-  const [teams, setTeams] = useState<Team[] | null>(null);
-  const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
-  const [inquiries, setInquiries] = useState<Inquiry[] | null>(null);
   const [openPanel, setOpenPanel] = useState<"profile" | "password" | null>(null);
-
-  useEffect(() => {
-    if (!profile?.uid) return;
-    const unsub = subscribeMyMemberships(profile.uid, setMemberships);
-    return () => unsub();
-  }, [profile?.uid]);
-
-  useEffect(() => {
-    if (!profile?.uid) return;
-    const unsub = subscribeMyInquiries(profile.uid, setInquiries);
-    return () => unsub();
-  }, [profile?.uid]);
-
-  useEffect(() => {
-    if (memberships === null) return;
-    if (memberships.length === 0) {
-      setTeams([]);
-      setExhibitions([]);
-      return;
-    }
-    Promise.all(memberships.map((m) => getTeam(m.teamId))).then((ts) =>
-      setTeams(ts.filter((t): t is Team => !!t))
-    );
-    Promise.all(memberships.map((m) => listTeamExhibitions(m.teamId))).then((lists) =>
-      setExhibitions(lists.flat().sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()))
-    );
-  }, [memberships]);
 
   if (!profile) return <CenteredSpinner />;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
+    <div>
       <div className="mb-8 flex items-center gap-2">
         <User className="text-primary" size={24} />
-        <h1 className="text-2xl font-extrabold">마이페이지</h1>
+        <h1 className="text-2xl font-extrabold">내 정보</h1>
       </div>
 
       <div className="rounded-2xl border border-border bg-white p-6">
@@ -130,104 +74,6 @@ function MyPageContent() {
           <div className="mt-6 border-t border-border pt-6">
             <PasswordChangeFields firebaseUser={firebaseUser} />
           </div>
-        )}
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold">내 팀</h2>
-          <Link href="/team" className="flex items-center gap-1 text-sm font-semibold text-primary">
-            <Plus size={14} /> 팀 구성하러 가기
-          </Link>
-        </div>
-        {teams === null ? (
-          <p className="mt-3 text-sm text-muted">불러오는 중...</p>
-        ) : teams.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">아직 소속된 팀이 없어요.</p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-2">
-            {teams.map((t) => (
-              <li key={t.id} className="flex items-center justify-between rounded-xl bg-surface px-4 py-2.5 text-sm">
-                <span className="font-medium">{t.name}</span>
-                <Badge>{t.categoryName}</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold">내 게시글</h2>
-          <Link href="/exhibitions/new" className="flex items-center gap-1 text-sm font-semibold text-primary">
-            <Plus size={14} /> 등록
-          </Link>
-        </div>
-        {exhibitions === null ? (
-          <p className="mt-3 text-sm text-muted">불러오는 중...</p>
-        ) : exhibitions.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">아직 등록한 전시물이 없어요.</p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-2">
-            {exhibitions.map((e) => (
-              <li key={e.id} className="rounded-xl bg-surface px-4 py-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <Link href={`/exhibitions/${e.id}`} className="truncate font-medium hover:text-primary">
-                    {e.title}
-                  </Link>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge>{e.categoryName}</Badge>
-                    <span className="text-xs text-muted">{STATUS_LABEL[e.status]}</span>
-                    {e.award && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        <Trophy size={12} /> {e.award.label}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {e.status === "published" && (
-                  <div className="mt-1.5 flex items-center gap-3 text-xs text-muted">
-                    <span className="flex items-center gap-1">
-                      <Heart size={12} /> {e.likeCount}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle size={12} /> {e.commentCount}
-                    </span>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold">내 문의</h2>
-          <Link href="/inquiries" className="flex items-center gap-1 text-sm font-semibold text-primary">
-            문의하러 가기 <ArrowRight size={14} />
-          </Link>
-        </div>
-        {inquiries === null ? (
-          <p className="mt-3 text-sm text-muted">불러오는 중...</p>
-        ) : inquiries.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">아직 남긴 문의가 없어요.</p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-2">
-            {inquiries.slice(0, 3).map((q) => (
-              <li key={q.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2.5 text-sm">
-                <span className="truncate font-medium">{q.title}</span>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                    INQUIRY_STATUS_LABEL[q.status].className
-                  )}
-                >
-                  {INQUIRY_STATUS_LABEL[q.status].label}
-                </span>
-              </li>
-            ))}
-          </ul>
         )}
       </div>
     </div>

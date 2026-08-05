@@ -133,3 +133,9 @@ export function subscribeMyMemberships(uid: string, cb: (memberships: TeamMember
     cb(snap.docs.map((d) => d.data() as TeamMembership));
   });
 }
+
+export async function listMembershipsForUser(uid: string): Promise<TeamMembership[]> {
+  const q = query(collection(db, "teamMemberships"), where("uid", "==", uid));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data() as TeamMembership);
+}

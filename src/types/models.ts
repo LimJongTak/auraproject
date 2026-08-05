@@ -175,6 +175,32 @@ export interface Inquiry {
   createdAt: Timestamp;
 }
 
+export type MileageSource = "contest" | "manual";
+
+// One doc per grant event (append-only ledger, not a mutable balance) — a
+// student's total is just sum(amount) over their docs. studentName/
+// studentIdNumber are snapshotted at grant time (same denorm pattern as
+// Team.categoryName / Exhibition.teamName / Inquiry.authorName) so the
+// admin roster/export doesn't need per-row user lookups, and so the record
+// reflects what was true when it was granted even if the profile changes
+// later. Only admins can create/update/delete — students never write these.
+export interface MileageGrant {
+  id: string;
+  uid: string;
+  studentName: string;
+  studentIdNumber: string;
+  amount: number;
+  title: string;
+  content: string;
+  semester: string; // "YYYY-1" | "YYYY-2" — see src/lib/utils/semester.ts
+  source: MileageSource;
+  categoryId: string | null;
+  categoryName: string | null;
+  grantedBy: string;
+  grantedByName: string;
+  createdAt: Timestamp;
+}
+
 // Doc ID == date ("YYYY-MM-DD", local time of the visiting browser).
 // One doc per calendar day, count incremented once per browser session.
 export interface VisitStat {

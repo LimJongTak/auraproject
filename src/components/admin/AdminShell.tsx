@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarClock,
   ClipboardList,
+  Coins,
   Gavel,
   LayoutGrid,
   Megaphone,
@@ -25,6 +26,7 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin/notices", label: "공지사항 관리", icon: Megaphone },
   { href: "/admin/inquiries", label: "문의 관리", icon: MessageSquare },
   { href: "/admin/users", label: "사용자 관리", icon: Users2 },
+  { href: "/admin/mileage", label: "마일리지 관리", icon: Coins },
   { href: "/admin/analytics", label: "방문자 통계", icon: BarChart3 },
   { href: "/admin/quicklinks", label: "퀵메뉴 관리", icon: PanelRight },
 ];
