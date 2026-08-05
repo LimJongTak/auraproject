@@ -5,6 +5,7 @@ import { ClipboardCheck, ShieldCheck, ShieldOff, UserX } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { listAllUsers, setUserRole } from "@/lib/firestore/users";
 import { adminWithdrawUser } from "@/lib/functions/adminWithdrawUser";
+import { backfillStudentIdIndex } from "@/lib/functions/backfillStudentIdIndex";
 import type { MemberType, UserProfile, UserRole } from "@/types/models";
 import { CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
@@ -33,6 +34,9 @@ export default function AdminUsersPage() {
   const [memberTypeFilter, setMemberTypeFilter] = useState<"all" | MemberType>("all");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all");
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<string | null>(null);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
 
   async function refresh() {
     setUsers(await listAllUsers());
@@ -89,11 +93,42 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function handleBackfill() {
+    setMigrating(true);
+    setMigrationError(null);
+    setMigrationResult(null);
+    try {
+      const { created, skipped } = await backfillStudentIdIndex();
+      setMigrationResult(
+        `${created}명 마이그레이션 완료` + (skipped.length > 0 ? ` (건너뜀 ${skipped.length}명 — 학번/사번 미입력 또는 이미 등록됨)` : "")
+      );
+    } catch (err) {
+      setMigrationError(err instanceof Error ? err.message : "마이그레이션 중 문제가 발생했어요");
+    } finally {
+      setMigrating(false);
+    }
+  }
+
   if (!users) return <CenteredSpinner />;
 
   return (
     <div className="max-w-3xl">
       <AdminPageHeader title="사용자 관리" />
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div>
+          <p className="text-sm font-semibold text-amber-900">학번/사번 로그인 마이그레이션 (1회성)</p>
+          <p className="mt-0.5 text-xs text-amber-700">
+            기존 회원이 학번/사번으로 로그인할 수 있도록 인덱스를 채워요. 여러 번 실행해도 안전해요.
+          </p>
+          {migrationResult && <p className="mt-1 text-xs font-medium text-amber-900">{migrationResult}</p>}
+          {migrationError && <ErrorText>{migrationError}</ErrorText>}
+        </div>
+        <Button variant="outline" size="sm" loading={migrating} onClick={handleBackfill}>
+          마이그레이션 실행
+        </Button>
+      </div>
+
       {withdrawError && <ErrorText>{withdrawError}</ErrorText>}
 
       <div className="flex flex-wrap items-end gap-3">
