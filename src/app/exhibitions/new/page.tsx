@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/Button";
 import { Breadcrumb, CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { LiveLinkPreview } from "@/components/link-preview/LiveLinkPreview";
 import { LinkPreviewHelp } from "@/components/link-preview/LinkPreviewHelp";
+import { DeployHelp } from "@/components/exhibitions/DeployHelp";
+import { PresentationHelp } from "@/components/exhibitions/PresentationHelp";
 
 type SubmitPhase = "idle" | "creating" | "rendering" | "uploading" | "publishing" | "error";
 
@@ -294,6 +296,7 @@ function NewExhibitionForm() {
         />
         {projectUrl && <LiveLinkPreview url={projectUrl} />}
         <LinkPreviewHelp />
+        <DeployHelp />
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">발표자료 PDF (선택)</span>
@@ -311,6 +314,7 @@ function NewExhibitionForm() {
             )}
           </label>
           {fileError && <span className="text-xs font-medium text-red-600">{fileError}</span>}
+          <PresentationHelp />
         </div>
 
         {progress && (

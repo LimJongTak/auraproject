@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge, Breadcrumb, CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { LiveLinkPreview } from "@/components/link-preview/LiveLinkPreview";
 import { LinkPreviewHelp } from "@/components/link-preview/LinkPreviewHelp";
+import { DeployHelp } from "@/components/exhibitions/DeployHelp";
 
 export default function EditExhibitionPage() {
   return (
@@ -140,6 +141,7 @@ function EditExhibitionForm() {
         <Input label="프로젝트 링크 (선택)" {...register("projectUrl")} error={errors.projectUrl?.message} />
         {projectUrl && <LiveLinkPreview url={projectUrl} />}
         <LinkPreviewHelp />
+        <DeployHelp />
 
         {error && <ErrorText>{error}</ErrorText>}
 
