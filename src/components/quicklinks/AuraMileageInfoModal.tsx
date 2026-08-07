@@ -126,7 +126,7 @@ export function AuraMileageInfoModal({ url, onClose }: { url?: string; onClose: 
                 </li>
               </ol>
               <a
-                href="https://m.site.naver.com/2diJK"
+                href="https://aura.scnuai.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary-light px-4 py-2.5 text-sm font-semibold text-primary-dark transition hover:bg-primary/20"
