@@ -43,10 +43,6 @@ export default function NoticesPage() {
               <li key={a.id}>
                 <Link href={`/notices/${a.id}`} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-surface">
                   <div className="flex min-w-0 items-center gap-3">
-                    {a.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
-                    )}
                     <p className="truncate font-medium">{a.title}</p>
                   </div>
                   <p className="shrink-0 text-xs text-muted">{formatDate(a.createdAt)}</p>
