@@ -16,6 +16,7 @@ import {
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useAdminIssueCounts } from "@/hooks/useAdminIssueCounts";
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin/banners", label: "배너 관리", icon: CalendarClock },
@@ -34,8 +35,23 @@ export const ADMIN_NAV_ITEMS = [
 // Shared by both /admin/* pages (via app/admin/layout.tsx) and /judge/* pages
 // (via app/judge/layout.tsx, admin-only) so the sidebar doesn't disappear
 // just because 심사/시상 관리 happens to live outside the /admin route tree.
+function IssueBadge({ count, pushRight = false }: { count: number; pushRight?: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white",
+        pushRight && "ml-auto"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const issueCounts = useAdminIssueCounts();
 
   return (
     <div className="mx-auto flex max-w-7xl items-start gap-8 px-4 py-8 lg:py-10">
@@ -57,6 +73,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <item.icon size={17} className="shrink-0" />
                 {item.label}
+                <IssueBadge count={issueCounts[item.href] ?? 0} pushRight />
               </Link>
             );
           })}
@@ -80,6 +97,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <item.icon size={14} />
                 {item.label}
+                <IssueBadge count={issueCounts[item.href] ?? 0} />
               </Link>
             );
           })}
