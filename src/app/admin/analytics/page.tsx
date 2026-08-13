@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Download, LineChart } from "lucide-react";
+import { Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { listAllVisitStats } from "@/lib/firestore/visits";
 import {
@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 
 const PERIODS: VisitPeriod[] = ["day", "week", "month", "year"];
-type ChartType = "bar" | "line";
 
 // Evenly spaces points across the plot with a small edge margin so the
 // first/last dots and labels don't get clipped by the container edge.
@@ -29,7 +28,6 @@ function lineX(index: number, total: number): number {
 export default function AdminAnalyticsPage() {
   const [stats, setStats] = useState<VisitStat[] | null>(null);
   const [period, setPeriod] = useState<VisitPeriod>("day");
-  const [chartType, setChartType] = useState<ChartType>("bar");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -86,111 +84,59 @@ export default function AdminAnalyticsPage() {
       ) : (
         <>
           <div className="mt-6 rounded-2xl border border-border bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm text-muted">{CURRENT_PERIOD_LABEL[period]} 방문자 수</p>
-                <p className="mt-1 text-3xl font-extrabold">{current.toLocaleString()}명</p>
-                <p className="mt-1 text-xs text-muted">
-                  {buckets[0]?.start} ~ {buckets[buckets.length - 1]?.end} 합계 {windowTotal.toLocaleString()}명
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-1 rounded-full bg-surface p-1">
-                <button
-                  type="button"
-                  onClick={() => setChartType("bar")}
-                  aria-label="막대그래프"
-                  className={cn(
-                    "rounded-full p-1.5 transition",
-                    chartType === "bar" ? "bg-white text-primary shadow-sm" : "text-muted hover:text-foreground"
-                  )}
-                >
-                  <BarChart3 size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartType("line")}
-                  aria-label="선(점) 그래프"
-                  className={cn(
-                    "rounded-full p-1.5 transition",
-                    chartType === "line" ? "bg-white text-primary shadow-sm" : "text-muted hover:text-foreground"
-                  )}
-                >
-                  <LineChart size={15} />
-                </button>
-              </div>
-            </div>
+            <p className="text-sm text-muted">{CURRENT_PERIOD_LABEL[period]} 방문자 수</p>
+            <p className="mt-1 text-3xl font-extrabold">{current.toLocaleString()}명</p>
+            <p className="mt-1 text-xs text-muted">
+              {buckets[0]?.start} ~ {buckets[buckets.length - 1]?.end} 합계 {windowTotal.toLocaleString()}명
+            </p>
 
-            {chartType === "bar" ? (
-              <div className="mt-8 flex h-48 items-end gap-2">
+            <div className="mt-8">
+              <div className="relative h-48 w-full">
+                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="border-t border-dashed border-border" />
+                  ))}
+                </div>
+                <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <polyline
+                    points={buckets
+                      .map((b, i) => `${lineX(i, buckets.length)},${100 - (b.count / max) * 100}`)
+                      .join(" ")}
+                    fill="none"
+                    className="stroke-primary"
+                    strokeWidth={2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
                 {buckets.map((b, i) => (
                   <div
                     key={b.start}
-                    className="relative flex flex-1 flex-col items-center justify-end"
+                    className="absolute -translate-x-1/2 translate-y-1/2 cursor-default"
+                    style={{ left: `${lineX(i, buckets.length)}%`, bottom: `${(b.count / max) * 100}%` }}
                     onMouseEnter={() => setHoverIndex(i)}
                     onMouseLeave={() => setHoverIndex((cur) => (cur === i ? null : cur))}
                   >
                     {hoverIndex === i && (
-                      <div className="absolute -top-9 z-10 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-semibold text-white shadow">
+                      <div className="absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-semibold text-white shadow">
                         {b.label} · {b.count.toLocaleString()}명
                       </div>
                     )}
-                    <div
-                      className="w-full rounded-t-md bg-primary transition-all"
-                      style={{ height: `${Math.max(2, (b.count / max) * 100)}%` }}
-                    />
-                    <span className="mt-2 truncate text-[11px] text-muted">{b.label}</span>
+                    <div className="h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="mt-8">
-                <div className="relative h-48 w-full">
-                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div key={i} className="border-t border-dashed border-border" />
-                    ))}
-                  </div>
-                  <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline
-                      points={buckets
-                        .map((b, i) => `${lineX(i, buckets.length)},${100 - (b.count / max) * 100}`)
-                        .join(" ")}
-                      fill="none"
-                      className="stroke-primary"
-                      strokeWidth={2}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                  {buckets.map((b, i) => (
-                    <div
-                      key={b.start}
-                      className="absolute -translate-x-1/2 translate-y-1/2 cursor-default"
-                      style={{ left: `${lineX(i, buckets.length)}%`, bottom: `${(b.count / max) * 100}%` }}
-                      onMouseEnter={() => setHoverIndex(i)}
-                      onMouseLeave={() => setHoverIndex((cur) => (cur === i ? null : cur))}
-                    >
-                      {hoverIndex === i && (
-                        <div className="absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-semibold text-white shadow">
-                          {b.label} · {b.count.toLocaleString()}명
-                        </div>
-                      )}
-                      <div className="h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
-                    </div>
-                  ))}
-                </div>
-                <div className="relative mt-2 h-4 w-full">
-                  {buckets.map((b, i) => (
-                    <span
-                      key={b.start}
-                      className="absolute -translate-x-1/2 truncate text-[11px] text-muted"
-                      style={{ left: `${lineX(i, buckets.length)}%` }}
-                    >
-                      {b.label}
-                    </span>
-                  ))}
-                </div>
+              <div className="relative mt-2 h-4 w-full">
+                {buckets.map((b, i) => (
+                  <span
+                    key={b.start}
+                    className="absolute -translate-x-1/2 truncate text-[11px] text-muted"
+                    style={{ left: `${lineX(i, buckets.length)}%` }}
+                  >
+                    {b.label}
+                  </span>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-white">
