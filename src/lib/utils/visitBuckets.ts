@@ -23,6 +23,15 @@ export const PERIOD_LABEL: Record<VisitPeriod, string> = {
   year: "년간",
 };
 
+// The headline stat shows the *current* bucket (today / this week / this
+// month / this year), not a sum across the whole displayed window.
+export const CURRENT_PERIOD_LABEL: Record<VisitPeriod, string> = {
+  day: "오늘",
+  week: "이번 주",
+  month: "이번 달",
+  year: "올해",
+};
+
 function toKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
