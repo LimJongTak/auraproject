@@ -1,5 +1,6 @@
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase/client";
+import { resizeImageFile } from "@/lib/utils/resizeImage";
 
 export const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -16,8 +17,8 @@ export function validateThumbnailImage(file: File): void {
 }
 
 export async function uploadExhibitionThumbnail(exhibitionId: string, file: File): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const { blob, ext } = await resizeImageFile(file);
   const storageRef = ref(storage, `exhibitions/${exhibitionId}/thumbnail-manual.${ext}`);
-  await uploadBytes(storageRef, file, { contentType: file.type });
+  await uploadBytes(storageRef, blob, { contentType: blob.type });
   return getDownloadURL(storageRef);
 }

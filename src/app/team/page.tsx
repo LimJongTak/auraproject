@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Users, Copy, Check, LogOut, Trash2, Plus } from "lucide-react";
 import { db } from "@/lib/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +17,7 @@ import { Badge, CenteredSpinner, ErrorText } from "@/components/ui/misc";
 import { cn } from "@/lib/utils/cn";
 
 export default function TeamPage() {
+  const router = useRouter();
   const { firebaseUser, loading } = useAuth();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
@@ -38,7 +40,7 @@ export default function TeamPage() {
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <p className="font-semibold">로그인이 필요해요</p>
         <p className="mt-1 text-sm text-muted">팀을 구성하려면 먼저 로그인해주세요.</p>
-        <Button className="mt-6" onClick={() => (window.location.href = "/login")}>
+        <Button className="mt-6" onClick={() => router.push("/login")}>
           로그인하러 가기
         </Button>
       </div>

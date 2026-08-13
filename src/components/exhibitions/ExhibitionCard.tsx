@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Heart, Trophy } from "lucide-react";
 import type { Exhibition } from "@/types/models";
 import { Badge } from "@/components/ui/misc";
@@ -16,11 +17,12 @@ export function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
           </span>
         )}
         {exhibition.thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={exhibition.thumbnailUrl}
             alt={exhibition.title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            fill
+            sizes="(min-width: 1024px) 384px, (min-width: 640px) 320px, 90vw"
+            className="object-cover transition duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-muted">이미지 없음</div>

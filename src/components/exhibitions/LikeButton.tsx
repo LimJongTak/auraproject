@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeMyLike, toggleLike } from "@/lib/firestore/likes";
 import { cn } from "@/lib/utils/cn";
 
 export function LikeButton({ exhibitionId, likeCount }: { exhibitionId: string; likeCount: number }) {
+  const router = useRouter();
   const { firebaseUser } = useAuth();
   const [liked, setLiked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -25,7 +27,7 @@ export function LikeButton({ exhibitionId, likeCount }: { exhibitionId: string; 
 
   async function handleClick() {
     if (!firebaseUser) {
-      window.location.href = "/login";
+      router.push("/login");
       return;
     }
     if (busy) return;
