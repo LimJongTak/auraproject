@@ -23,9 +23,9 @@ service firebase.storage {
     }
     match /exhibitions/{exhibitionId}/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && isTeamMemberOf(exhibitionId)
-                   && fileName.matches('thumbnail[.].+')
-                   && request.resource.size < 2 * 1024 * 1024
+      allow write: if isSignedIn() && (isTeamMemberOf(exhibitionId) || isAdmin())
+                   && fileName.matches('thumbnail(-manual)?[.].+')
+                   && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|webp|png)');
     }
     match /config/theme/{fileName} {

@@ -9,6 +9,11 @@ import { RequireAuth } from "@/components/auth/Guard";
 import { getExhibition, updateExhibitionMeta } from "@/lib/firestore/exhibitions";
 import { getMembership } from "@/lib/firestore/teams";
 import { exhibitionMetaSchema, type ExhibitionMetaValues } from "@/lib/validation/exhibitionSchema";
+import {
+  uploadExhibitionThumbnail,
+  validateThumbnailImage,
+  ThumbnailValidationError,
+} from "@/lib/storage/uploadExhibitionThumbnail";
 import type { Exhibition } from "@/types/models";
 import type { LinkPreviewApiResponse } from "@/lib/linkPreview/types";
 import { Input, Textarea } from "@/components/ui/Field";
@@ -33,6 +38,9 @@ function EditExhibitionForm() {
   const [exhibition, setExhibition] = useState<Exhibition | null | undefined>(undefined);
   const [canEdit, setCanEdit] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
 
   const {
     register,
@@ -53,9 +61,30 @@ function EditExhibitionForm() {
           oneLiner: data.oneLiner,
           projectUrl: data.projectUrl ?? "",
         });
+        setThumbnailUrl(data.thumbnailUrl);
       }
     });
   }, [params.id, reset]);
+
+  async function handleThumbnailChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !exhibition) return;
+    setThumbnailError(null);
+    try {
+      validateThumbnailImage(file);
+    } catch (err) {
+      setThumbnailError(err instanceof ThumbnailValidationError ? err.message : "이미지 파일을 확인해주세요");
+      return;
+    }
+    setUploadingThumbnail(true);
+    try {
+      setThumbnailUrl(await uploadExhibitionThumbnail(exhibition.id, file));
+    } catch {
+      setThumbnailError("이미지 업로드에 실패했어요");
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  }
 
   useEffect(() => {
     if (!profile || !exhibition) return;
@@ -112,6 +141,7 @@ function EditExhibitionForm() {
         categoryName: exhibition.categoryName,
         projectUrl: values.projectUrl || null,
         linkPreview,
+        thumbnailUrl,
       });
       router.push(`/exhibitions/${exhibition.id}`);
     } catch (err) {
@@ -135,6 +165,39 @@ function EditExhibitionForm() {
             <Badge>{exhibition.categoryName}</Badge>
           </div>
           <span className="text-xs text-muted">전시물의 카테고리는 팀이 참가한 대회로 고정되어 바꿀 수 없어요.</span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">대표 이미지 (선택)</span>
+          <div className="flex items-center gap-3">
+            {thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumbnailUrl}
+                alt="대표 이미지 미리보기"
+                className="aspect-[4/3] h-24 w-auto rounded-lg border border-border object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[4/3] h-24 items-center justify-center rounded-lg border border-dashed border-border bg-surface text-xs text-muted">
+                미리보기
+              </div>
+            )}
+            <div className="flex flex-1 flex-col gap-1.5">
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleThumbnailChange} />
+              <span className="text-xs text-muted">JPG, PNG, WebP (최대 5MB) · 권장 규격 1200×900px (4:3 가로형)</span>
+              <span className="text-xs text-muted">온라인전시관 카드에 이 비율로 잘려서 노출돼요.</span>
+              {uploadingThumbnail && <span className="text-xs text-muted">업로드 중...</span>}
+              {thumbnailUrl && (
+                <button
+                  type="button"
+                  onClick={() => setThumbnailUrl(null)}
+                  className="self-start text-xs font-medium text-red-600 underline underline-offset-2"
+                >
+                  이미지 삭제
+                </button>
+              )}
+            </div>
+          </div>
+          {thumbnailError && <span className="text-xs font-medium text-red-600">{thumbnailError}</span>}
         </div>
         <Input label="제목" {...register("title")} error={errors.title?.message} />
         <Textarea label="한줄 소개" {...register("oneLiner")} error={errors.oneLiner?.message} />

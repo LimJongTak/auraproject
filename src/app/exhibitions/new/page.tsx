@@ -13,6 +13,11 @@ import { createTeam, getTeam, subscribeMyMemberships, TeamError } from "@/lib/fi
 import { createDraftExhibition, publishExhibitionPages } from "@/lib/firestore/exhibitions";
 import { renderPdfToImages, validatePdfFile, PdfValidationError, MAX_PDF_PAGES } from "@/lib/pdf/renderPdfToImages";
 import { uploadExhibitionPages } from "@/lib/storage/uploadExhibitionPages";
+import {
+  uploadExhibitionThumbnail,
+  validateThumbnailImage,
+  ThumbnailValidationError,
+} from "@/lib/storage/uploadExhibitionThumbnail";
 import { exhibitionMetaSchema, type ExhibitionMetaValues } from "@/lib/validation/exhibitionSchema";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
 import type { Category, Team, TeamMembership } from "@/types/models";
@@ -47,6 +52,9 @@ function NewExhibitionForm() {
   const [teamsByCategory, setTeamsByCategory] = useState<Record<string, Team>>({});
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(null);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [phase, setPhase] = useState<SubmitPhase>("idle");
   const [progress, setProgress] = useState<{ label: string; percent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +139,26 @@ function NewExhibitionForm() {
     }
   }
 
+  function handleThumbnailFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setThumbnailError(null);
+    if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+    if (!f) {
+      setThumbnailFile(null);
+      setThumbnailPreviewUrl(null);
+      return;
+    }
+    try {
+      validateThumbnailImage(f);
+      setThumbnailFile(f);
+      setThumbnailPreviewUrl(URL.createObjectURL(f));
+    } catch (err) {
+      setThumbnailFile(null);
+      setThumbnailPreviewUrl(null);
+      setThumbnailError(err instanceof ThumbnailValidationError ? err.message : "이미지 파일을 확인해주세요");
+    }
+  }
+
   async function onSubmit(values: ExhibitionMetaValues) {
     const category = categories.find((c) => c.id === values.categoryId);
     if (!category) {
@@ -196,7 +224,7 @@ function NewExhibitionForm() {
       });
 
       let pageImageUrls: string[] = [];
-      let thumbnailUrl: string | null = null;
+      let autoThumbnailUrl: string | null = null;
 
       if (file) {
         setPhase("rendering");
@@ -209,14 +237,21 @@ function NewExhibitionForm() {
           setProgress({ label: "이미지 업로드 중", percent: (p.bytesTransferred / p.totalBytes) * 100 });
         });
         pageImageUrls = uploaded.pageImageUrls;
-        thumbnailUrl = uploaded.thumbnailUrl;
+        autoThumbnailUrl = uploaded.thumbnailUrl;
+      }
+
+      let manualThumbnailUrl: string | null = null;
+      if (thumbnailFile) {
+        setPhase("uploading");
+        setProgress({ label: "대표 이미지 업로드 중", percent: 100 });
+        manualThumbnailUrl = await uploadExhibitionThumbnail(exhibitionId, thumbnailFile);
       }
 
       setPhase("publishing");
       await publishExhibitionPages(exhibitionId, {
         pageImageUrls,
         pageCount: pageImageUrls.length,
-        thumbnailUrl,
+        thumbnailUrl: manualThumbnailUrl ?? autoThumbnailUrl,
       });
 
       router.push(`/exhibitions/${exhibitionId}`);
@@ -297,6 +332,32 @@ function NewExhibitionForm() {
         {projectUrl && <LiveLinkPreview url={projectUrl} />}
         <LinkPreviewHelp />
         <DeployHelp />
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">대표 이미지 (선택)</span>
+          <div className="flex items-center gap-3">
+            {thumbnailPreviewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumbnailPreviewUrl}
+                alt="대표 이미지 미리보기"
+                className="aspect-[4/3] h-24 w-auto rounded-lg border border-border object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[4/3] h-24 items-center justify-center rounded-lg border border-dashed border-border bg-surface text-xs text-muted">
+                미리보기
+              </div>
+            )}
+            <div className="flex flex-1 flex-col gap-1.5">
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleThumbnailFileChange} />
+              <span className="text-xs text-muted">JPG, PNG, WebP (최대 5MB) · 권장 규격 1200×900px (4:3 가로형)</span>
+              <span className="text-xs text-muted">
+                온라인전시관 카드에 이 비율로 잘려서 노출돼요. 등록하지 않으면 PDF 첫 페이지가 대신 사용돼요.
+              </span>
+            </div>
+          </div>
+          {thumbnailError && <span className="text-xs font-medium text-red-600">{thumbnailError}</span>}
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">발표자료 PDF (선택)</span>

@@ -77,6 +77,7 @@ export async function updateExhibitionMeta(
     categoryName: string;
     projectUrl: string | null;
     linkPreview: LinkPreviewData | null;
+    thumbnailUrl?: string | null;
   }
 ) {
   await updateDoc(doc(db, "exhibitions", id), {
