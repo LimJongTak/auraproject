@@ -35,7 +35,7 @@ export function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
             <Heart size={12} /> {exhibition.likeCount}
           </span>
         </div>
-        <p className="font-bold text-foreground">{exhibition.teamName}</p>
+        <p className="font-bold text-foreground">{exhibition.title}</p>
         <p className="line-clamp-2 text-sm text-muted">{exhibition.oneLiner}</p>
       </div>
     </Link>
