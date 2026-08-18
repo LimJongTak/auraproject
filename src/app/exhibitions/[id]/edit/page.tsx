@@ -7,7 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { getExhibition, updateExhibitionMeta } from "@/lib/firestore/exhibitions";
+import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
+import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
 import { exhibitionMetaSchema, type ExhibitionMetaValues } from "@/lib/validation/exhibitionSchema";
 import {
   uploadExhibitionThumbnail,
@@ -37,6 +39,7 @@ function EditExhibitionForm() {
   const { profile } = useAuth();
   const [exhibition, setExhibition] = useState<Exhibition | null | undefined>(undefined);
   const [canEdit, setCanEdit] = useState<boolean | undefined>(undefined);
+  const [submissionClosed, setSubmissionClosed] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
@@ -90,14 +93,19 @@ function EditExhibitionForm() {
     if (!profile || !exhibition) return;
     if (profile.role === "admin") {
       setCanEdit(true);
+      setSubmissionClosed(false);
       return;
     }
     getMembership(profile.uid, exhibition.categoryId).then((m) => {
       setCanEdit(!!m && m.teamId === exhibition.teamId);
     });
+    getCategory(exhibition.categoryId).then((c) => {
+      setSubmissionClosed(!c || getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed");
+    });
   }, [profile, exhibition]);
 
-  if (exhibition === undefined || !profile || canEdit === undefined) return <CenteredSpinner />;
+  if (exhibition === undefined || !profile || canEdit === undefined || submissionClosed === undefined)
+    return <CenteredSpinner />;
   if (exhibition === null) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center text-muted">전시물을 찾을 수 없어요.</div>
@@ -105,6 +113,13 @@ function EditExhibitionForm() {
   }
   if (!canEdit) {
     return <div className="mx-auto max-w-md px-4 py-20 text-center text-muted">수정 권한이 없어요.</div>;
+  }
+  if (submissionClosed) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-20 text-center text-muted">
+        게시 마감일이 지나 더 이상 수정할 수 없어요.
+      </div>
+    );
   }
 
   async function onSubmit(values: ExhibitionMetaValues) {

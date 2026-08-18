@@ -5,7 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Trash2, Trophy } from "lucide-react";
 import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
+import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
+import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
 import type { Exhibition } from "@/types/models";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge, Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
@@ -24,6 +26,8 @@ export default function ExhibitionDetailPage() {
   const [tab, setTab] = useState<"story" | "comments">("story");
   const [deleting, setDeleting] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [submissionClosed, setSubmissionClosed] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     getExhibition(params.id).then(setExhibition);
@@ -35,11 +39,15 @@ export default function ExhibitionDetailPage() {
       return;
     }
     if (profile.role === "admin") {
+      setIsAdmin(true);
       setCanEdit(true);
       return;
     }
     getMembership(profile.uid, exhibition.categoryId).then((m) => {
       setCanEdit(!!m && m.teamId === exhibition.teamId);
+    });
+    getCategory(exhibition.categoryId).then((c) => {
+      setSubmissionClosed(!c || getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed");
     });
   }, [profile, exhibition]);
 
@@ -85,12 +93,18 @@ export default function ExhibitionDetailPage() {
         </div>
         {canEdit && (
           <div className="flex items-center gap-4">
-            <Link
-              href={`/exhibitions/${exhibition.id}/edit`}
-              className="flex items-center gap-1 text-sm font-medium text-muted hover:text-primary"
-            >
-              <Pencil size={14} /> 수정
-            </Link>
+            {isAdmin || !submissionClosed ? (
+              <Link
+                href={`/exhibitions/${exhibition.id}/edit`}
+                className="flex items-center gap-1 text-sm font-medium text-muted hover:text-primary"
+              >
+                <Pencil size={14} /> 수정
+              </Link>
+            ) : (
+              <span className="text-sm font-medium text-muted/50" title="게시 마감일이 지나 수정할 수 없어요">
+                게시 마감으로 수정 불가
+              </span>
+            )}
             <button
               onClick={handleDelete}
               disabled={deleting}

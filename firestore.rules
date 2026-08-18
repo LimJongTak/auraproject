@@ -212,6 +212,7 @@ service cloud.firestore {
            && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['status', 'pageImageUrls', 'pageCount', 'thumbnailUrl', 'updatedAt']))
           || (myMembershipTeamId(resource.data.categoryId) == resource.data.teamId
+              && isWithinSubmissionWindow(resource.data.categoryId)
               && request.resource.data.likeCount == resource.data.likeCount
               && request.resource.data.commentCount == resource.data.commentCount
               && request.resource.data.teamId == resource.data.teamId
