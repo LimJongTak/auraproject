@@ -123,14 +123,6 @@ export default function ContestPage() {
             return (
               <div key={c.id} className="group flex flex-col gap-3">
                 <Link href={`/contest/${c.id}`} className="relative block aspect-[4/3] w-full overflow-hidden rounded-2xl bg-surface transition group-hover:shadow-lg">
-                  <span className={cn("absolute left-2 top-2 z-10 rounded-full px-2.5 py-1 text-xs font-bold shadow-sm", PHASE_LABEL[phase].className)}>
-                    {PHASE_LABEL[phase].label}
-                  </span>
-                  {phase === "ongoing" && (
-                    <span className={cn("absolute right-2 top-2 z-10 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold shadow-sm", STATE_LABEL[state].className)}>
-                      {STATE_LABEL[state].label}
-                    </span>
-                  )}
                   {c.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -144,7 +136,19 @@ export default function ContestPage() {
                 </Link>
 
                 <div className="flex flex-1 flex-col gap-1.5">
-                  {c.contestType && <p className="text-xs font-semibold text-muted">{c.contestType}</p>}
+                  <div className="flex items-center justify-between gap-2">
+                    {c.contestType && <p className="text-xs font-semibold text-muted">{c.contestType}</p>}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", PHASE_LABEL[phase].className)}>
+                        {PHASE_LABEL[phase].label}
+                      </span>
+                      {phase === "ongoing" && (
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
+                          {STATE_LABEL[state].label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <Link href={`/contest/${c.id}`}>
                     <h3 className="line-clamp-1 font-bold text-foreground transition hover:text-primary">{c.name}</h3>
                   </Link>
