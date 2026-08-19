@@ -19,6 +19,7 @@ import { JudgeFloatingScorePanel } from "@/components/judge/JudgeFloatingScorePa
 import { HashtagBadges } from "@/components/exhibitions/HashtagBadges";
 import { ReferenceLinksRow } from "@/components/exhibitions/ReferenceLinksRow";
 import { ShareButton } from "@/components/exhibitions/ShareButton";
+import { OtherExhibitions } from "@/components/exhibitions/OtherExhibitions";
 import { cn } from "@/lib/utils/cn";
 
 export default function ExhibitionDetailPage() {
@@ -152,36 +153,36 @@ export default function ExhibitionDetailPage() {
         <ShareButton title={exhibition.title} text={exhibition.oneLiner} />
       </div>
 
-      <div className="mt-10 rounded-2xl border border-border bg-white">
-        <div className="flex gap-6 border-b border-border px-6">
-          <button
-            onClick={() => setTab("story")}
-            className={cn(
-              "border-b-2 py-4 text-sm font-bold transition",
-              tab === "story" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
-            )}
-          >
-            TEAM STORY
-          </button>
-          <button
-            onClick={() => setTab("comments")}
-            className={cn(
-              "border-b-2 py-4 text-sm font-bold transition",
-              tab === "comments" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
-            )}
-          >
-            응원 댓글 ({exhibition.commentCount})
-          </button>
-        </div>
-
-        <div className="p-6 sm:p-8">
-          {tab === "story" ? (
-            <PdfPageScroller pageImageUrls={exhibition.pageImageUrls} />
-          ) : (
-            <CommentSection exhibitionId={exhibition.id} />
+      <div className="mt-10 flex gap-6 border-b border-border">
+        <button
+          onClick={() => setTab("story")}
+          className={cn(
+            "border-b-2 py-4 text-sm font-bold transition",
+            tab === "story" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
           )}
-        </div>
+        >
+          아이템 소개
+        </button>
+        <button
+          onClick={() => setTab("comments")}
+          className={cn(
+            "border-b-2 py-4 text-sm font-bold transition",
+            tab === "comments" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
+          )}
+        >
+          커뮤니티
+        </button>
       </div>
+
+      <div className="py-8">
+        {tab === "story" ? (
+          <PdfPageScroller pageImageUrls={exhibition.pageImageUrls} />
+        ) : (
+          <CommentSection exhibitionId={exhibition.id} />
+        )}
+      </div>
+
+      <OtherExhibitions currentId={exhibition.id} />
 
       <JudgeFloatingScorePanel exhibition={exhibition} />
     </div>
