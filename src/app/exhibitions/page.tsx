@@ -1,22 +1,53 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Plus } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeCategories } from "@/lib/firestore/categories";
-import type { Category, Exhibition, SortOption } from "@/types/models";
+import type { Category, Exhibition, ExhibitionSearchType, SortOption } from "@/types/models";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
-import { Breadcrumb, EmptyState } from "@/components/ui/misc";
+import { ExhibitionSearchBar } from "@/components/exhibitions/ExhibitionSearchBar";
+import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Select } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 
+function matchesSearch(exhibition: Exhibition, searchType: ExhibitionSearchType, term: string): boolean {
+  if (!term) return true;
+  switch (searchType) {
+    case "team":
+      return exhibition.teamName.toLowerCase().includes(term);
+    case "title":
+      return exhibition.title.toLowerCase().includes(term);
+    case "content":
+      return exhibition.oneLiner.toLowerCase().includes(term);
+    case "hashtag":
+      return (exhibition.hashtags ?? []).some((tag) => tag.toLowerCase().includes(term.replace(/^#+/, "")));
+    case "all":
+    default:
+      return exhibition.title.toLowerCase().includes(term) || exhibition.oneLiner.toLowerCase().includes(term);
+  }
+}
+
 export default function ExhibitionsPage() {
+  return (
+    <Suspense fallback={<CenteredSpinner />}>
+      <ExhibitionsPageInner />
+    </Suspense>
+  );
+}
+
+function ExhibitionsPageInner() {
+  const searchParams = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [sort, setSort] = useState<SortOption>("latest");
-  const [search, setSearch] = useState("");
+  const [searchType, setSearchType] = useState<ExhibitionSearchType>(
+    (searchParams.get("searchType") as ExhibitionSearchType) || "all"
+  );
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,11 +65,8 @@ export default function ExhibitionsPage() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return exhibitions;
-    return exhibitions.filter(
-      (e) => e.title.toLowerCase().includes(term) || e.oneLiner.toLowerCase().includes(term)
-    );
-  }, [exhibitions, search]);
+    return exhibitions.filter((e) => matchesSearch(e, searchType, term));
+  }, [exhibitions, search, searchType]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -47,7 +75,9 @@ export default function ExhibitionsPage() {
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">온라인전시관</h1>
-          <p className="mt-1 text-sm text-muted">{exhibitions.length}개의 프로젝트와 함께합니다.</p>
+          <p className="mt-1 text-sm text-muted">
+            <span className="font-semibold text-primary">{exhibitions.length}개</span>의 프로젝트와 함께합니다.
+          </p>
         </div>
         <Link href="/exhibitions/new">
           <Button>
@@ -85,15 +115,13 @@ export default function ExhibitionsPage() {
           ))}
         </div>
 
-        <div className="relative ml-auto w-full max-w-xs">
-          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="제목, 소개로 검색"
-            className="w-full rounded-full border border-border bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-          />
-        </div>
+        <ExhibitionSearchBar
+          searchType={searchType}
+          onSearchTypeChange={setSearchType}
+          value={search}
+          onChange={setSearch}
+          className="ml-auto w-full max-w-sm"
+        />
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

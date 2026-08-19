@@ -103,10 +103,17 @@ export default function ContestPage() {
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
         {categories === null &&
-          Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-2xl bg-surface" />
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex animate-pulse flex-col gap-3">
+              <div className="aspect-[4/3] w-full rounded-2xl bg-surface" />
+              <div className="flex flex-col gap-2">
+                <div className="h-3 w-16 rounded bg-surface" />
+                <div className="h-4 w-2/3 rounded bg-surface" />
+                <div className="h-3 w-full rounded bg-surface" />
+              </div>
+            </div>
           ))}
 
         {categories !== null &&
@@ -114,46 +121,48 @@ export default function ContestPage() {
             const state = getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt);
             const phase = getContestPhase(c);
             return (
-              <div key={c.id} className="flex flex-col justify-between rounded-2xl border border-border bg-white p-6">
-                <div>
-                  {c.thumbnailUrl && (
+              <div key={c.id} className="group flex flex-col gap-3">
+                <Link href={`/contest/${c.id}`} className="relative block aspect-[4/3] w-full overflow-hidden rounded-2xl bg-surface transition group-hover:shadow-lg">
+                  <span className={cn("absolute left-2 top-2 z-10 rounded-full px-2.5 py-1 text-xs font-bold shadow-sm", PHASE_LABEL[phase].className)}>
+                    {PHASE_LABEL[phase].label}
+                  </span>
+                  {phase === "ongoing" && (
+                    <span className={cn("absolute right-2 top-2 z-10 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold shadow-sm", STATE_LABEL[state].className)}>
+                      {STATE_LABEL[state].label}
+                    </span>
+                  )}
+                  {c.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={c.thumbnailUrl}
                       alt={c.name}
-                      className="mb-4 aspect-[2/1] w-full rounded-xl object-cover"
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-muted">이미지 없음</div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-xl font-bold">{c.name}</h3>
-                    {c.contestType && (
-                      <span className="rounded-full bg-primary-light px-2 py-0.5 text-xs font-semibold text-primary-dark">
-                        {c.contestType}
-                      </span>
-                    )}
-                    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", PHASE_LABEL[phase].className)}>
-                      {PHASE_LABEL[phase].label}
-                    </span>
-                    {phase === "ongoing" && (
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", STATE_LABEL[state].className)}>
-                        {STATE_LABEL[state].label}
-                      </span>
-                    )}
+                </Link>
+
+                <div className="flex flex-1 flex-col gap-1.5">
+                  {c.contestType && <p className="text-xs font-semibold text-muted">{c.contestType}</p>}
+                  <Link href={`/contest/${c.id}`}>
+                    <h3 className="line-clamp-1 font-bold text-foreground transition hover:text-primary">{c.name}</h3>
+                  </Link>
+                  {c.description && <p className="line-clamp-2 text-sm text-muted">{c.description}</p>}
+                  <p className="text-xs text-muted">{formatDateRange(c.submissionOpenAt, c.submissionCloseAt)}</p>
+
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <Link href={`/contest/${c.id}`} className="flex-1">
+                      <Button size="sm" className="w-full">
+                        자세히 보기 <ArrowRight size={14} />
+                      </Button>
+                    </Link>
+                    <Link href="/exhibitions" className="flex-1">
+                      <Button size="sm" variant="outline" className="w-full">
+                        전시물 보러가기
+                      </Button>
+                    </Link>
                   </div>
-                  {c.description && <p className="mt-2 text-sm text-muted">{c.description}</p>}
-                  <p className="mt-2 text-xs text-muted">{formatDateRange(c.submissionOpenAt, c.submissionCloseAt)}</p>
-                </div>
-                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                  <Link href={`/contest/${c.id}`} className="flex-1">
-                    <Button className="w-full">
-                      자세히 보기 <ArrowRight size={14} />
-                    </Button>
-                  </Link>
-                  <Link href="/exhibitions" className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      전시물 보러가기
-                    </Button>
-                  </Link>
                 </div>
               </div>
             );

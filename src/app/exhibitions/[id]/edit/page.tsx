@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { getExhibition, updateExhibitionMeta } from "@/lib/firestore/exhibitions";
+import { HashtagInput } from "@/components/ui/HashtagInput";
+import { ReferenceLinksFields } from "@/components/exhibitions/ReferenceLinksFields";
 import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
 import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
@@ -50,6 +52,7 @@ function EditExhibitionForm() {
     handleSubmit,
     watch,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ExhibitionMetaValues>({ resolver: zodResolver(exhibitionMetaSchema) });
   const projectUrl = watch("projectUrl") ?? "";
@@ -63,6 +66,14 @@ function EditExhibitionForm() {
           title: data.title,
           oneLiner: data.oneLiner,
           projectUrl: data.projectUrl ?? "",
+          hashtags: data.hashtags ?? [],
+          referenceLinks: {
+            homepage: data.referenceLinks?.homepage ?? "",
+            instagram: data.referenceLinks?.instagram ?? "",
+            youtube: data.referenceLinks?.youtube ?? "",
+            appStore: data.referenceLinks?.appStore ?? "",
+            googlePlay: data.referenceLinks?.googlePlay ?? "",
+          },
         });
         setThumbnailUrl(data.thumbnailUrl);
       }
@@ -157,6 +168,14 @@ function EditExhibitionForm() {
         projectUrl: values.projectUrl || null,
         linkPreview,
         thumbnailUrl,
+        hashtags: values.hashtags ?? [],
+        referenceLinks: {
+          homepage: values.referenceLinks?.homepage || null,
+          instagram: values.referenceLinks?.instagram || null,
+          youtube: values.referenceLinks?.youtube || null,
+          appStore: values.referenceLinks?.appStore || null,
+          googlePlay: values.referenceLinks?.googlePlay || null,
+        },
       });
       router.push(`/exhibitions/${exhibition.id}`);
     } catch (err) {
@@ -220,6 +239,21 @@ function EditExhibitionForm() {
         {projectUrl && <LiveLinkPreview url={projectUrl} />}
         <LinkPreviewHelp />
         <DeployHelp />
+
+        <Controller
+          name="hashtags"
+          control={control}
+          render={({ field }) => (
+            <HashtagInput
+              label="해시태그 (선택)"
+              hint="최대 8개까지 등록할 수 있어요. Enter 또는 쉼표로 추가하세요."
+              value={field.value ?? []}
+              onChange={field.onChange}
+            />
+          )}
+        />
+
+        <ReferenceLinksFields register={register} errors={errors} />
 
         {error && <ErrorText>{error}</ErrorText>}
 

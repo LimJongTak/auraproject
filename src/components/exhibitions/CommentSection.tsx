@@ -1,12 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { MessageCircle, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { addComment, deleteComment, subscribeComments } from "@/lib/firestore/comments";
 import type { ExhibitionComment } from "@/types/models";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
+
+const AVATAR_COLORS = [
+  "bg-orange-100 text-orange-700",
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-violet-100 text-violet-700",
+  "bg-rose-100 text-rose-700",
+  "bg-amber-100 text-amber-700",
+];
+
+function avatarColor(name: string): string {
+  const sum = Array.from(name).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
 
 function formatRelative(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -50,7 +64,7 @@ export function CommentSection({ exhibitionId }: { exhibitionId: string }) {
   return (
     <div className="flex flex-col gap-6">
       {firebaseUser ? (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <Textarea
             placeholder="응원의 한마디를 남겨주세요"
             value={text}
@@ -58,9 +72,12 @@ export function CommentSection({ exhibitionId }: { exhibitionId: string }) {
             maxLength={500}
             className="min-h-20"
           />
-          <Button type="submit" size="sm" className="self-end" loading={submitting} disabled={!text.trim()}>
-            댓글 작성
-          </Button>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted">{text.length}/500</span>
+            <Button type="submit" size="sm" loading={submitting} disabled={!text.trim()}>
+              댓글 작성
+            </Button>
+          </div>
         </form>
       ) : (
         <p className="rounded-xl bg-surface px-4 py-3 text-sm text-muted">
@@ -68,10 +85,15 @@ export function CommentSection({ exhibitionId }: { exhibitionId: string }) {
         </p>
       )}
 
-      <ul className="flex flex-col gap-4">
+      <ul className="flex flex-col divide-y divide-border">
         {comments.map((comment) => (
-          <li key={comment.id} className="flex items-start justify-between gap-3 border-b border-border pb-4">
-            <div>
+          <li key={comment.id} className="flex items-start gap-3 py-4 first:pt-0">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarColor(comment.authorName)}`}
+            >
+              {comment.authorName.slice(0, 1)}
+            </span>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-semibold">{comment.authorName}</span>
                 <span className="text-xs text-muted">
@@ -92,7 +114,12 @@ export function CommentSection({ exhibitionId }: { exhibitionId: string }) {
               )}
           </li>
         ))}
-        {comments.length === 0 && <p className="py-6 text-center text-sm text-muted">첫 응원 댓글을 남겨보세요.</p>}
+        {comments.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted">
+            <MessageCircle size={28} className="text-border" />
+            <p className="text-sm">첫 응원 댓글을 남겨보세요.</p>
+          </div>
+        )}
       </ul>
     </div>
   );

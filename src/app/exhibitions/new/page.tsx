@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UploadCloud, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,8 @@ import { RequireAuth } from "@/components/auth/Guard";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { createTeam, getTeam, subscribeMyMemberships, TeamError } from "@/lib/firestore/teams";
 import { createDraftExhibition, publishExhibitionPages } from "@/lib/firestore/exhibitions";
+import { HashtagInput } from "@/components/ui/HashtagInput";
+import { ReferenceLinksFields } from "@/components/exhibitions/ReferenceLinksFields";
 import { renderPdfToImages, validatePdfFile, PdfValidationError, MAX_PDF_PAGES } from "@/lib/pdf/renderPdfToImages";
 import { uploadExhibitionPages } from "@/lib/storage/uploadExhibitionPages";
 import {
@@ -63,10 +65,11 @@ function NewExhibitionForm() {
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors },
   } = useForm<ExhibitionMetaValues>({
     resolver: zodResolver(exhibitionMetaSchema),
-    defaultValues: { categoryId: presetCategoryId },
+    defaultValues: { categoryId: presetCategoryId, hashtags: [], referenceLinks: {} },
   });
   const projectUrl = watch("projectUrl") ?? "";
   const watchedCategoryId = watch("categoryId");
@@ -220,6 +223,14 @@ function NewExhibitionForm() {
         oneLiner: values.oneLiner,
         projectUrl: values.projectUrl || null,
         linkPreview,
+        hashtags: values.hashtags ?? [],
+        referenceLinks: {
+          homepage: values.referenceLinks?.homepage || null,
+          instagram: values.referenceLinks?.instagram || null,
+          youtube: values.referenceLinks?.youtube || null,
+          appStore: values.referenceLinks?.appStore || null,
+          googlePlay: values.referenceLinks?.googlePlay || null,
+        },
         submittedByUid: profile!.uid,
       });
 
@@ -332,6 +343,21 @@ function NewExhibitionForm() {
         {projectUrl && <LiveLinkPreview url={projectUrl} />}
         <LinkPreviewHelp />
         <DeployHelp />
+
+        <Controller
+          name="hashtags"
+          control={control}
+          render={({ field }) => (
+            <HashtagInput
+              label="해시태그 (선택)"
+              hint="최대 8개까지 등록할 수 있어요. Enter 또는 쉼표로 추가하세요."
+              value={field.value ?? []}
+              onChange={field.onChange}
+            />
+          )}
+        />
+
+        <ReferenceLinksFields register={register} errors={errors} />
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">대표 이미지 (선택)</span>

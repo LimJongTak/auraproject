@@ -16,6 +16,9 @@ import { LikeButton } from "@/components/exhibitions/LikeButton";
 import { CommentSection } from "@/components/exhibitions/CommentSection";
 import { PdfPageScroller } from "@/components/exhibitions/PdfPageScroller";
 import { JudgeFloatingScorePanel } from "@/components/judge/JudgeFloatingScorePanel";
+import { HashtagBadges } from "@/components/exhibitions/HashtagBadges";
+import { ReferenceLinksRow } from "@/components/exhibitions/ReferenceLinksRow";
+import { ShareButton } from "@/components/exhibitions/ShareButton";
 import { cn } from "@/lib/utils/cn";
 
 export default function ExhibitionDetailPage() {
@@ -120,10 +123,11 @@ export default function ExhibitionDetailPage() {
       <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{exhibition.title}</h1>
       <p className="mt-2 text-foreground/80">{exhibition.oneLiner}</p>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-muted">
           🏅 {exhibition.year}
         </span>
+        <HashtagBadges hashtags={exhibition.hashtags ?? []} />
       </div>
 
       {exhibition.projectUrl && exhibition.linkPreview && (
@@ -139,17 +143,22 @@ export default function ExhibitionDetailPage() {
         </div>
       )}
 
-      <div className="mt-6 flex items-center gap-3">
-        <LikeButton exhibitionId={exhibition.id} likeCount={exhibition.likeCount} />
+      <div className="mt-4">
+        <ReferenceLinksRow links={exhibition.referenceLinks} />
       </div>
 
-      <div className="mt-10 border-b border-border">
-        <div className="flex gap-6">
+      <div className="mt-6 flex items-center gap-3">
+        <LikeButton exhibitionId={exhibition.id} likeCount={exhibition.likeCount} />
+        <ShareButton title={exhibition.title} text={exhibition.oneLiner} />
+      </div>
+
+      <div className="mt-10 rounded-2xl border border-border bg-white">
+        <div className="flex gap-6 border-b border-border px-6">
           <button
             onClick={() => setTab("story")}
             className={cn(
-              "border-b-2 pb-3 text-sm font-bold transition",
-              tab === "story" ? "border-primary text-primary" : "border-transparent text-muted"
+              "border-b-2 py-4 text-sm font-bold transition",
+              tab === "story" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
             )}
           >
             TEAM STORY
@@ -157,21 +166,21 @@ export default function ExhibitionDetailPage() {
           <button
             onClick={() => setTab("comments")}
             className={cn(
-              "border-b-2 pb-3 text-sm font-bold transition",
-              tab === "comments" ? "border-primary text-primary" : "border-transparent text-muted"
+              "border-b-2 py-4 text-sm font-bold transition",
+              tab === "comments" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
             )}
           >
             응원 댓글 ({exhibition.commentCount})
           </button>
         </div>
-      </div>
 
-      <div className="py-8">
-        {tab === "story" ? (
-          <PdfPageScroller pageImageUrls={exhibition.pageImageUrls} />
-        ) : (
-          <CommentSection exhibitionId={exhibition.id} />
-        )}
+        <div className="p-6 sm:p-8">
+          {tab === "story" ? (
+            <PdfPageScroller pageImageUrls={exhibition.pageImageUrls} />
+          ) : (
+            <CommentSection exhibitionId={exhibition.id} />
+          )}
+        </div>
       </div>
 
       <JudgeFloatingScorePanel exhibition={exhibition} />

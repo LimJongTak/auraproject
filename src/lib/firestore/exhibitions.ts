@@ -14,7 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Exhibition, ExhibitionStatus, LinkPreviewData, SortOption } from "@/types/models";
+import type { Exhibition, ExhibitionStatus, LinkPreviewData, ReferenceLinks, SortOption } from "@/types/models";
 
 const exhibitionsRef = () => collection(db, "exhibitions");
 
@@ -27,6 +27,8 @@ export interface NewExhibitionInput {
   oneLiner: string;
   projectUrl: string | null;
   linkPreview: LinkPreviewData | null;
+  hashtags: string[];
+  referenceLinks: ReferenceLinks;
   submittedByUid: string;
 }
 
@@ -44,6 +46,8 @@ export async function createDraftExhibition(input: NewExhibitionInput): Promise<
     thumbnailUrl: null,
     pageImageUrls: [],
     pageCount: 0,
+    hashtags: input.hashtags,
+    referenceLinks: input.referenceLinks,
     likeCount: 0,
     commentCount: 0,
     status: "draft" as ExhibitionStatus,
@@ -78,6 +82,8 @@ export async function updateExhibitionMeta(
     projectUrl: string | null;
     linkPreview: LinkPreviewData | null;
     thumbnailUrl?: string | null;
+    hashtags: string[];
+    referenceLinks: ReferenceLinks;
   }
 ) {
   await updateDoc(doc(db, "exhibitions", id), {

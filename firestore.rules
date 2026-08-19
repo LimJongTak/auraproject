@@ -225,6 +225,16 @@ service cloud.firestore {
                   || request.resource.data.commentCount == resource.data.commentCount - 1))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['award']))
+          // Admins can edit general fields (title, oneLiner, hashtags, referenceLinks,
+          // etc.) on any exhibition, any time — unlike the team-member branch above,
+          // this doesn't require team membership or an open submission window. It
+          // still protects the same invariants (counters/status/team stay put) so it
+          // can't be used to sneak past the dedicated like/comment/status/award paths.
+          || (isAdmin()
+              && request.resource.data.likeCount == resource.data.likeCount
+              && request.resource.data.commentCount == resource.data.commentCount
+              && request.resource.data.teamId == resource.data.teamId
+              && request.resource.data.status == resource.data.status)
       );
       allow delete: if isAdmin()
         || (isSignedIn() && myMembershipTeamId(resource.data.categoryId) == resource.data.teamId);

@@ -91,6 +91,15 @@ export interface LinkPreviewData {
 
 export type ExhibitionStatus = "draft" | "published" | "hidden";
 
+// All optional at registration — only rendered on the detail page when set.
+export interface ReferenceLinks {
+  homepage: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  appStore: string | null;
+  googlePlay: string | null;
+}
+
 export interface Exhibition {
   id: string;
   teamId: string;
@@ -105,6 +114,10 @@ export interface Exhibition {
   thumbnailUrl: string | null;
   pageImageUrls: string[];
   pageCount: number;
+  // Optional, user-entered tags (no leading '#'), max 8 — used by the
+  // hashtag search filter and rendered as pills on cards/detail page.
+  hashtags: string[];
+  referenceLinks: ReferenceLinks;
   likeCount: number;
   commentCount: number;
   status: ExhibitionStatus;
@@ -138,6 +151,8 @@ export interface BannerTheme {
 }
 
 export type SortOption = "popular" | "latest";
+
+export type ExhibitionSearchType = "all" | "team" | "title" | "content" | "hashtag";
 
 // Doc ID: `${judgeUid}_${exhibitionId}` — at most one evaluation per judge
 // per submission, enforced in firestore.rules.
