@@ -56,6 +56,14 @@ function ExhibitionsPageInner() {
     return () => unsub();
   }, []);
 
+  // Hashtag pills link here with a query string while this page may already
+  // be mounted (e.g. clicking a tag on a card in this same list), so re-sync
+  // the search state whenever the URL params change instead of only on mount.
+  useEffect(() => {
+    setSearchType((searchParams.get("searchType") as ExhibitionSearchType) || "all");
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
   useEffect(() => {
     setLoading(true);
     listPublishedExhibitions({ categoryId: categoryId || null, sort })

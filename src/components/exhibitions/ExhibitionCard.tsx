@@ -30,7 +30,7 @@ export function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
         <p className="line-clamp-1 font-bold text-foreground transition group-hover:text-primary">{exhibition.title}</p>
         <p className="line-clamp-2 text-sm text-muted">{exhibition.oneLiner}</p>
         {exhibition.hashtags && exhibition.hashtags.length > 0 && (
-          <HashtagBadges hashtags={exhibition.hashtags} max={3} interactive={false} className="mt-auto pt-1" />
+          <HashtagBadges hashtags={exhibition.hashtags} max={3} nested className="mt-auto pt-1" />
         )}
       </div>
     </Link>
