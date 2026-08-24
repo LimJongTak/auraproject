@@ -132,7 +132,7 @@ function ExhibitionsPageInner() {
         />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <ExhibitionCardSkeleton key={i} />)
           : filtered.map((exhibition) => <ExhibitionCard key={exhibition.id} exhibition={exhibition} />)}

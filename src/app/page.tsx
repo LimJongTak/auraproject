@@ -101,7 +101,7 @@ export default function HomePage() {
           </Link>
         </div>
         {recent === null ? (
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <ExhibitionCardSkeleton key={i} />
             ))}
@@ -109,7 +109,7 @@ export default function HomePage() {
         ) : recent.length > MARQUEE_THRESHOLD ? (
           <ExhibitionMarquee exhibitions={recent} />
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {recent.map((e) => (
               <ExhibitionCard key={e.id} exhibition={e} />
             ))}
