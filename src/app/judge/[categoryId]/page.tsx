@@ -9,8 +9,10 @@ import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
 import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
+import { getAssignment } from "@/lib/firestore/judgeAssignments";
 import { RubricScoreForm } from "@/components/judge/RubricScoreForm";
-import type { Category, Evaluation, Exhibition } from "@/types/models";
+import { JudgeAssignmentPanel } from "@/components/admin/JudgeAssignmentPanel";
+import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
@@ -32,10 +34,19 @@ function JudgeCategoryDetail() {
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [evaluations, setEvaluations] = useState<Evaluation[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Only meaningful for role == 'judge' — undefined while loading, null once
+  // confirmed the caller isn't assigned to this contest. Admins skip this
+  // check entirely (see the gate below).
+  const [myAssignment, setMyAssignment] = useState<JudgeAssignment | null | undefined>(undefined);
 
   useEffect(() => {
     getCategory(params.categoryId).then(setCategory);
   }, [params.categoryId]);
+
+  useEffect(() => {
+    if (!profile || profile.role !== "judge") return;
+    getAssignment(profile.uid, params.categoryId).then(setMyAssignment);
+  }, [profile, params.categoryId]);
 
   useEffect(() => {
     listPublishedExhibitions({ categoryId: params.categoryId, max: 500 }).then(setExhibitions);
@@ -58,11 +69,21 @@ function JudgeCategoryDetail() {
     return map;
   }, [evaluations, profile]);
 
-  if (category === undefined || exhibitions === null || !profile) return <CenteredSpinner />;
+  const isJudge = profile?.role === "judge";
+  if (category === undefined || exhibitions === null || !profile || (isJudge && myAssignment === undefined)) {
+    return <CenteredSpinner />;
+  }
   if (category === null) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20">
         <EmptyState title="대회를 찾을 수 없어요" description="삭제되었거나 존재하지 않는 대회예요." />
+      </div>
+    );
+  }
+  if (isJudge && !myAssignment) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20">
+        <EmptyState title="이 대회의 심사위원으로 지정되지 않았어요" description="관리자에게 심사위원 지정을 요청해주세요." />
       </div>
     );
   }
@@ -151,6 +172,8 @@ function JudgeCategoryDetail() {
       {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
         <AwardPanel exhibitions={exhibitions} evaluations={evaluations} />
       )}
+
+      {profile.role === "admin" && <JudgeAssignmentPanel categoryId={category.id} categoryName={category.name} />}
     </div>
   );
 }

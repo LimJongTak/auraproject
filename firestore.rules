@@ -7,9 +7,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function isAdmin() { return isSignedIn() && myProfile().role == 'admin'; }
-    function isJudgeOrAdmin() {
-      return isSignedIn() && (myProfile().role == 'admin' || myProfile().role == 'judge');
+    // A 'judge'-role user only gets access within a specific contest once an
+    // admin has created a matching judgeAssignments/{uid}_{categoryId} doc —
+    // see judgeAssignments below. Admins bypass this entirely.
+    function isAssignedJudge(categoryId) {
+      return isSignedIn() && myProfile().role == 'judge'
+        && exists(/databases/$(database)/documents/judgeAssignments/$(request.auth.uid + '_' + categoryId));
     }
+    function canJudge(categoryId) { return isAdmin() || isAssignedJudge(categoryId); }
 
     // ---------------- users ----------------
     match /users/{uid} {
@@ -95,6 +100,19 @@ service cloud.firestore {
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // ---------------- judge assignments (doc ID == `${uid}_${categoryId}`) ----------------
+    // Scopes a 'judge'-role account to specific contests — see
+    // isAssignedJudge() above and evaluations below. Admin-managed only:
+    // created either by assigning an existing user or by the bulk temp
+    // account issuer (issueJudgeAccounts Cloud Function, which uses the
+    // Admin SDK and so bypasses these rules entirely).
+    match /judgeAssignments/{assignmentId} {
+      allow get: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create, delete: if isAdmin();
+      allow update: if false;
     }
 
     // ---------------- visit stats (anonymous visitor counter) ----------------
@@ -254,12 +272,17 @@ service cloud.firestore {
 
     // ---------------- evaluations (doc ID == `${judgeUid}_${exhibitionId}`) ----------------
     // Judges and admins only — students must never be able to read scores.
+    // A judge only sees/writes evaluations for contests they're assigned to
+    // (canJudge) — for list(), this relies on the client always filtering
+    // where('categoryId','==', ...) (same "provably true per result" pattern
+    // as exhibitions/inquiries above), which every query in evaluations.ts does.
     match /evaluations/{evalId} {
-      allow get, list: if isJudgeOrAdmin();
-      allow create: if isJudgeOrAdmin()
+      allow get: if canJudge(resource.data.categoryId);
+      allow list: if canJudge(resource.data.categoryId);
+      allow create: if canJudge(request.resource.data.categoryId)
         && request.resource.data.judgeUid == request.auth.uid
         && evalId == request.auth.uid + '_' + request.resource.data.exhibitionId;
-      allow update: if isJudgeOrAdmin()
+      allow update: if canJudge(resource.data.categoryId)
         && resource.data.judgeUid == request.auth.uid
         && request.resource.data.judgeUid == resource.data.judgeUid
         && request.resource.data.exhibitionId == resource.data.exhibitionId

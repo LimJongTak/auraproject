@@ -1,7 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { setGlobalOptions } from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/https";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
 setGlobalOptions({ maxInstances: 10 });
@@ -15,6 +16,13 @@ interface TeamData {
 
 interface MembershipData {
   teamId: string;
+}
+
+async function requireAdmin(db: FirebaseFirestore.Firestore, callerUid: string): Promise<void> {
+  const callerSnap = await db.doc(`users/${callerUid}`).get();
+  if (callerSnap.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "관리자만 사용할 수 있어요");
+  }
 }
 
 export const adminWithdrawUser = onCall(async (request) => {
@@ -113,4 +121,153 @@ export const backfillStudentIdIndex = onCall(async (request) => {
   }
 
   return { created, skipped };
+});
+
+// Login codes avoid visually-ambiguous characters (0/O, 1/I/L) since they're
+// meant to be read off a screen and typed in by a judge.
+const JUDGE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const JUDGE_PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const MAX_BULK_JUDGE_ISSUE = 30;
+
+function randomToken(length: number, alphabet: string): string {
+  const bytes = randomBytes(length);
+  let out = "";
+  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
+interface IssuedJudgeAccount {
+  uid: string;
+  loginCode: string;
+  password: string;
+  name: string;
+}
+
+// Bulk-issues throwaway judge accounts scoped to one contest. Each account
+// gets a random login code (used as its studentId, per the existing
+// studentId -> email login flow) and a random password, both returned once —
+// they aren't recoverable afterward, so the caller must show/copy them
+// immediately. Quantity is capped so one call can't mint an unbounded number
+// of Auth users.
+export const issueJudgeAccounts = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError("unauthenticated", "로그인이 필요해요");
+
+  const db = getFirestore();
+  await requireAdmin(db, callerUid);
+
+  const categoryId = request.data?.categoryId;
+  const count = request.data?.count;
+  const namePrefix =
+    typeof request.data?.namePrefix === "string" && request.data.namePrefix.trim()
+      ? request.data.namePrefix.trim().slice(0, 40)
+      : "임시 심사위원";
+
+  if (!categoryId || typeof categoryId !== "string") {
+    throw new HttpsError("invalid-argument", "대회를 확인할 수 없어요");
+  }
+  if (!Number.isInteger(count) || count < 1 || count > MAX_BULK_JUDGE_ISSUE) {
+    throw new HttpsError("invalid-argument", `발급 수량은 1~${MAX_BULK_JUDGE_ISSUE}개 사이여야 해요`);
+  }
+
+  const categorySnap = await db.doc(`categories/${categoryId}`).get();
+  if (!categorySnap.exists) {
+    throw new HttpsError("not-found", "대회를 찾을 수 없어요");
+  }
+  const categoryName = (categorySnap.data()?.name as string | undefined) ?? "";
+
+  const auth = getAuth();
+  const issued: IssuedJudgeAccount[] = [];
+
+  for (let i = 0; i < count; i++) {
+    let code: string | null = null;
+    let indexRef: FirebaseFirestore.DocumentReference | null = null;
+    for (let attempt = 0; attempt < 5 && !code; attempt++) {
+      const candidate = `JUDGE-${randomToken(6, JUDGE_CODE_ALPHABET)}`;
+      const ref = db.doc(`studentIdIndex/${candidate}`);
+      if (!(await ref.get()).exists) {
+        code = candidate;
+        indexRef = ref;
+      }
+    }
+    if (!code || !indexRef) {
+      throw new HttpsError("internal", "로그인 코드를 생성하지 못했어요. 다시 시도해주세요");
+    }
+
+    const password = randomToken(10, JUDGE_PASSWORD_ALPHABET);
+    const email = `${code.toLowerCase()}@judge.aura.local`;
+    const name = `${namePrefix} ${i + 1}`;
+
+    const userRecord = await auth.createUser({ email, password, displayName: name });
+
+    await db.doc(`users/${userRecord.uid}`).set({
+      name,
+      phone: "",
+      memberType: "staff",
+      school: "-",
+      department: "-",
+      grade: "",
+      studentId: code,
+      email,
+      role: "judge",
+      isTemporary: true,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    await indexRef.set({ uid: userRecord.uid, email });
+
+    await db.doc(`judgeAssignments/${userRecord.uid}_${categoryId}`).set({
+      uid: userRecord.uid,
+      categoryId,
+      categoryName,
+      judgeName: name,
+      isTemporary: true,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    issued.push({ uid: userRecord.uid, loginCode: code, password, name });
+  }
+
+  return { accounts: issued };
+});
+
+// Fully deletes a bulk-issued temp judge account (Auth user, profile,
+// studentId login index, and every contest assignment it holds). Restricted
+// to isTemporary accounts so it can't be pointed at a real user's account.
+export const revokeTempJudgeAccount = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError("unauthenticated", "로그인이 필요해요");
+
+  const db = getFirestore();
+  await requireAdmin(db, callerUid);
+
+  const targetUid = request.data?.uid;
+  if (!targetUid || typeof targetUid !== "string") {
+    throw new HttpsError("invalid-argument", "대상 계정을 확인할 수 없어요");
+  }
+
+  const userRef = db.doc(`users/${targetUid}`);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) throw new HttpsError("not-found", "계정을 찾을 수 없어요");
+
+  const userData = userSnap.data() as { isTemporary?: boolean; studentId?: string };
+  if (!userData.isTemporary) {
+    throw new HttpsError("failed-precondition", "임시 발급 계정만 이 기능으로 삭제할 수 있어요");
+  }
+
+  const assignmentsSnap = await db.collection("judgeAssignments").where("uid", "==", targetUid).get();
+  const batch = db.batch();
+  for (const assignmentDoc of assignmentsSnap.docs) batch.delete(assignmentDoc.ref);
+  if (userData.studentId) batch.delete(db.doc(`studentIdIndex/${userData.studentId}`));
+  batch.delete(userRef);
+  await batch.commit();
+
+  try {
+    await getAuth().deleteUser(targetUid);
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code !== "auth/user-not-found") throw err;
+  }
+
+  return { ok: true };
 });

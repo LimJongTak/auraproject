@@ -194,6 +194,11 @@ export default function AdminUsersPage() {
                     심사위원
                   </span>
                 )}
+                {user.isTemporary && (
+                  <span className="ml-2 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-muted">
+                    임시 계정
+                  </span>
+                )}
               </p>
               <p className="text-sm text-muted">{formatUserMeta(user)}</p>
             </div>

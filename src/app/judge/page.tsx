@@ -8,6 +8,7 @@ import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { listEvaluationsForCategory } from "@/lib/firestore/evaluations";
+import { listAssignmentsForUser } from "@/lib/firestore/judgeAssignments";
 import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
 import type { Category } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
@@ -38,22 +39,37 @@ function JudgeCategoryList() {
 
   useEffect(() => {
     if (!categories || !profile) return;
-    const closed = categories.filter(
-      (c) => getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed"
-    );
-    Promise.all(
-      closed.map(async (category) => {
-        const [exhibitions, evaluations] = await Promise.all([
-          listPublishedExhibitions({ categoryId: category.id, max: 500 }),
-          listEvaluationsForCategory(category.id),
-        ]);
-        return {
-          category,
-          publishedCount: exhibitions.length,
-          myScoredCount: evaluations.filter((e) => e.judgeUid === profile.uid).length,
-        };
-      })
-    ).then(setRows);
+    const myUid = profile.uid;
+    let cancelled = false;
+    (async () => {
+      // Admins judge/manage any closed contest; a judge only sees the
+      // contests an admin has assigned them to (see judgeAssignments).
+      const assignedCategoryIds =
+        profile.role === "admin" ? null : new Set((await listAssignmentsForUser(myUid)).map((a) => a.categoryId));
+      if (cancelled) return;
+      const closed = categories.filter(
+        (c) =>
+          getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed" &&
+          (assignedCategoryIds === null || assignedCategoryIds.has(c.id))
+      );
+      const nextRows = await Promise.all(
+        closed.map(async (category) => {
+          const [exhibitions, evaluations] = await Promise.all([
+            listPublishedExhibitions({ categoryId: category.id, max: 500 }),
+            listEvaluationsForCategory(category.id),
+          ]);
+          return {
+            category,
+            publishedCount: exhibitions.length,
+            myScoredCount: evaluations.filter((e) => e.judgeUid === myUid).length,
+          };
+        })
+      );
+      if (!cancelled) setRows(nextRows);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [categories, profile]);
 
   if (!categories || !rows) return <CenteredSpinner />;

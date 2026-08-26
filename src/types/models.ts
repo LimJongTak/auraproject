@@ -16,6 +16,10 @@ export interface UserProfile {
   studentId: string;
   email: string;
   role: UserRole;
+  // True for accounts bulk-issued via the per-contest judge account issuer
+  // (see JudgeAssignment) — lets the admin UI flag them as disposable and
+  // gates the full-account-delete function to only ever touch these.
+  isTemporary?: boolean;
   createdAt: Timestamp;
 }
 
@@ -167,6 +171,22 @@ export interface Evaluation {
   comment: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// Doc ID: `${judgeUid}_${categoryId}` — its existence is what scopes a
+// 'judge'-role user's access to one contest at a time (see firestore.rules
+// and RequireJudgeOrAdmin usage in /judge/[categoryId]). Created either by
+// assigning an existing user (isTemporary: false) or by bulk-issuing
+// throwaway accounts for a contest (isTemporary: true) — see
+// src/lib/functions/issueJudgeAccounts.ts.
+export interface JudgeAssignment {
+  id: string;
+  uid: string;
+  categoryId: string;
+  categoryName: string;
+  judgeName: string;
+  isTemporary: boolean;
+  createdAt: Timestamp;
 }
 
 export interface Announcement {
