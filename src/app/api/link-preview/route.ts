@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkUrlAllowed } from "@/lib/linkPreview/ssrfGuard";
 import { parseOgTags } from "@/lib/linkPreview/parseOg";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_BYTES = 150_000;
