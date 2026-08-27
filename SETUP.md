@@ -64,8 +64,8 @@ npx firebase emulators:start
 
 로그인 없이도 읽을 수 있는 데이터(`studentIdIndex`의 학번→이메일 조회 등)를 실제 브라우저가 아닌 스크립트가 대량으로 긁어가는 것을 막아줍니다. 미설정 시에도 앱은 정상 동작하며, 설정 후에도 아래 5번(콘솔 강제 적용)을 켜기 전까지는 아무것도 차단되지 않습니다.
 
-1. Firebase 콘솔 → **App Check** → **앱** → 5번 단계에서 등록한 웹 앱 선택 → **reCAPTCHA v3** 공급자 등록 (reCAPTCHA 사이트 키가 없다면 [Google reCAPTCHA 관리 콘솔](https://www.google.com/recaptcha/admin)에서 v3 키를 먼저 발급)
-2. 발급된 **사이트 키**를 `.env.local`의 `NEXT_PUBLIC_FIREBASE_RECAPTCHA_SITE_KEY`에 채우기
+1. Google Cloud 콘솔 → **Fraud Defense**(reCAPTCHA Enterprise) → **키** → 도메인(`scnuai.com` 등)을 등록한 **reCAPTCHA Enterprise** 키 생성 (일반 reCAPTCHA v3 admin 콘솔 키와는 다른 종류라 서로 안 맞으니 주의 — 이 프로젝트는 이미 `aurarecapcha` 키를 사용 중)
+2. 발급된 **사이트 키**를 `.env.local`의 `NEXT_PUBLIC_FIREBASE_RECAPTCHA_SITE_KEY`에 채우고, Firebase 콘솔 → **App Check** → **앱** → 5번 단계에서 등록한 웹 앱 선택 → **reCAPTCHA Enterprise** 공급자에 같은 사이트 키 등록
 3. 로컬 개발 중에는 App Check가 디버그 토큰을 콘솔에 한 번 출력합니다 — App Check → 앱 → **디버그 토큰 관리**에 등록해야 로컬에서 차단되지 않습니다
 4. 배포 후 며칠간 App Check 콘솔의 **요청** 탭에서 "검증됨" 비율을 모니터링 — 정상 트래픽이 대부분 검증되는 것을 확인하기 전에는 강제 적용하지 않기
 5. 문제없이 확인되면 App Check → **API** 탭에서 Firestore/Storage/Cloud Functions 각각을 **적용(Enforce)**으로 전환 — 이 순간부터 App Check 토큰이 없는 요청은 실제로 거부됩니다

@@ -1,5 +1,5 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { type Auth, getAuth } from "firebase/auth";
 import { type Firestore, getFirestore } from "firebase/firestore";
 import { type FirebaseStorage, getStorage } from "firebase/storage";
@@ -14,10 +14,13 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Optional: only set once App Check is registered in the Firebase console
-// (App Check > Apps > this web app > reCAPTCHA v3) — see SETUP.md. Left
-// unset, the app runs exactly as before (App Check enforcement must also be
-// turned on per-product in the console before it actually blocks anything).
+// This is a reCAPTCHA Enterprise site key (Google Cloud "Fraud Defense"),
+// not a classic reCAPTCHA v3 key — the two aren't interchangeable, and using
+// the wrong provider here fails App Check's token exchange with
+// "Invalid reCAPTCHA configuration for app". Registered under App Check >
+// Apps > this web app > reCAPTCHA Enterprise — see SETUP.md. Left unset, the
+// app runs exactly as before (App Check enforcement must also be turned on
+// per-product in the console before it actually blocks anything).
 const recaptchaSiteKey = process.env.NEXT_PUBLIC_FIREBASE_RECAPTCHA_SITE_KEY;
 
 // True once real values from a created Firebase project are in .env.local
@@ -55,7 +58,7 @@ if (canInit && recaptchaSiteKey) {
     (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
   initializeAppCheck(firebaseApp, {
-    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
     isTokenAutoRefreshEnabled: true,
   });
 }
