@@ -6,11 +6,24 @@ import { subscribeCategories } from "@/lib/firestore/categories";
 import { listAllExhibitionsForAdmin } from "@/lib/firestore/exhibitions";
 import { listAllTeamsForAdmin } from "@/lib/firestore/teams";
 import { listAllUsers } from "@/lib/firestore/users";
-import type { Category, Exhibition, MemberType, Team, UserProfile } from "@/types/models";
+import type { Category, Exhibition, ExhibitionStatus, MemberType, Team, UserProfile } from "@/types/models";
 import { toCsv, downloadCsv } from "@/lib/utils/csv";
 import { CenteredSpinner } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { Button } from "@/components/ui/Button";
+
+const STATUS_LABEL: Record<ExhibitionStatus, string> = {
+  draft: "임시저장",
+  published: "게시중",
+  hidden: "숨김",
+};
+
+// A team can end up with more than one exhibition doc for the same contest
+// (e.g. an abandoned draft from a failed submit attempt sitting alongside the
+// one that actually went through — see getDraftExhibitionForTeam), so a
+// team's overall status is "the best status any of its exhibitions reached",
+// not any single doc's status.
+const STATUS_RANK: Record<ExhibitionStatus, number> = { draft: 0, hidden: 1, published: 2 };
 
 interface Applicant {
   uid: string;
@@ -20,6 +33,7 @@ interface Applicant {
   grade: string;
   studentId: string;
   teamName: string;
+  status: ExhibitionStatus;
 }
 
 export default function AdminApplicantsPage() {
@@ -51,10 +65,18 @@ export default function AdminApplicantsPage() {
   const userById = new Map(users.map((u) => [u.uid, u]));
 
   function applicantsFor(categoryId: string): Applicant[] {
+    const statusByTeamId = new Map<string, ExhibitionStatus>();
+    for (const ex of exhibitions!.filter((e) => e.categoryId === categoryId)) {
+      const current = statusByTeamId.get(ex.teamId);
+      if (!current || STATUS_RANK[ex.status] > STATUS_RANK[current]) {
+        statusByTeamId.set(ex.teamId, ex.status);
+      }
+    }
+
     const seen = new Set<string>();
     const list: Applicant[] = [];
-    for (const ex of exhibitions!.filter((e) => e.categoryId === categoryId)) {
-      const team = teamById.get(ex.teamId);
+    for (const [teamId, status] of statusByTeamId) {
+      const team = teamById.get(teamId);
       if (!team) continue;
       for (const uid of team.memberUids) {
         if (seen.has(uid)) continue;
@@ -69,6 +91,7 @@ export default function AdminApplicantsPage() {
           grade: u.grade || "-",
           studentId: u.studentId || "-",
           teamName: team.name,
+          status,
         });
       }
     }
@@ -77,7 +100,7 @@ export default function AdminApplicantsPage() {
 
   function handleDownload(category: Category, applicants: Applicant[]) {
     const csv = toCsv(
-      ["이름", "구분", "학과/소속", "학년", "학번/사번", "팀명"],
+      ["이름", "구분", "학과/소속", "학년", "학번/사번", "팀명", "게시 여부"],
       applicants.map((a) => [
         a.name,
         a.memberType === "staff" ? "교직원" : "학생",
@@ -85,6 +108,7 @@ export default function AdminApplicantsPage() {
         a.grade,
         a.studentId,
         a.teamName,
+        STATUS_LABEL[a.status],
       ])
     );
     downloadCsv(`${category.name}_신청자명단.csv`, csv);
@@ -129,6 +153,7 @@ export default function AdminApplicantsPage() {
                         <th className="py-2 pr-4 font-semibold">학년</th>
                         <th className="py-2 pr-4 font-semibold">학번/사번</th>
                         <th className="py-2 pr-4 font-semibold">팀명</th>
+                        <th className="py-2 pr-4 font-semibold">게시 여부</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -140,6 +165,19 @@ export default function AdminApplicantsPage() {
                           <td className="py-2 pr-4">{a.grade}</td>
                           <td className="py-2 pr-4">{a.studentId}</td>
                           <td className="py-2 pr-4">{a.teamName}</td>
+                          <td className="py-2 pr-4">
+                            <span
+                              className={
+                                a.status === "published"
+                                  ? "font-semibold text-green-600"
+                                  : a.status === "hidden"
+                                    ? "font-semibold text-muted"
+                                    : "font-semibold text-amber-600"
+                              }
+                            >
+                              {STATUS_LABEL[a.status]}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
