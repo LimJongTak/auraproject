@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, LayoutGrid, MessageCircle, Plus, Trophy } from "lucide-react";
+import { Heart, LayoutGrid, MessageCircle, Plus, Trash2, Trophy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { listTeamExhibitions } from "@/lib/firestore/exhibitions";
+import { deleteExhibition, listTeamExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeMyMemberships } from "@/lib/firestore/teams";
 import type { Exhibition, ExhibitionStatus, TeamMembership } from "@/types/models";
 import { Badge, CenteredSpinner } from "@/components/ui/misc";
@@ -19,6 +19,7 @@ export default function MyExhibitionsPage() {
   const { profile } = useAuth();
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.uid) return;
@@ -26,16 +27,33 @@ export default function MyExhibitionsPage() {
     return () => unsub();
   }, [profile?.uid]);
 
+  function refresh() {
+    if (!memberships) return;
+    Promise.all(memberships.map((m) => listTeamExhibitions(m.teamId))).then((lists) =>
+      setExhibitions(lists.flat().sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()))
+    );
+  }
+
   useEffect(() => {
     if (memberships === null) return;
     if (memberships.length === 0) {
       setExhibitions([]);
       return;
     }
-    Promise.all(memberships.map((m) => listTeamExhibitions(m.teamId))).then((lists) =>
-      setExhibitions(lists.flat().sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()))
-    );
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberships]);
+
+  async function handleDeleteDraft(e: Exhibition) {
+    if (!confirm(`"${e.title}" 임시저장 글을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setDeletingId(e.id);
+    try {
+      await deleteExhibition(e.id);
+      refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (!profile) return <CenteredSpinner />;
 
@@ -62,9 +80,18 @@ export default function MyExhibitionsPage() {
             {exhibitions.map((e) => (
               <li key={e.id} className="rounded-xl bg-surface px-4 py-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <Link href={`/exhibitions/${e.id}`} className="truncate font-medium hover:text-primary">
-                    {e.title}
-                  </Link>
+                  {e.status === "draft" ? (
+                    <Link
+                      href={`/exhibitions/new?categoryId=${e.categoryId}`}
+                      className="truncate font-medium hover:text-primary"
+                    >
+                      {e.title}
+                    </Link>
+                  ) : (
+                    <Link href={`/exhibitions/${e.id}`} className="truncate font-medium hover:text-primary">
+                      {e.title}
+                    </Link>
+                  )}
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge>{e.categoryName}</Badge>
                     <span className="text-xs text-muted">{STATUS_LABEL[e.status]}</span>
@@ -73,8 +100,24 @@ export default function MyExhibitionsPage() {
                         <Trophy size={12} /> {e.award.label}
                       </span>
                     )}
+                    {e.status === "draft" && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDraft(e)}
+                        disabled={deletingId === e.id}
+                        className="text-muted transition hover:text-red-600 disabled:opacity-50"
+                        aria-label="임시저장 글 삭제"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
+                {e.status === "draft" && (
+                  <p className="mt-1.5 text-xs text-muted">
+                    등록이 끝나지 않은 글이에요. 제목을 눌러 이어서 작성할 수 있어요.
+                  </p>
+                )}
                 {e.status === "published" && (
                   <div className="mt-1.5 flex items-center gap-3 text-xs text-muted">
                     <span className="flex items-center gap-1">

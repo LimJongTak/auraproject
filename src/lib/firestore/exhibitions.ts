@@ -136,6 +136,18 @@ export async function listTeamExhibitions(teamId: string): Promise<Exhibition[]>
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Exhibition));
 }
 
+// A team's in-progress submission that never made it to "published" — e.g. the
+// browser closed or a network drop hit mid-upload after createDraftExhibition()
+// already committed the doc. The new-exhibition form resumes into this instead
+// of creating a second doc, since a team can only ever have one active draft
+// (nothing else ever creates a second "draft" for the same team).
+export async function getDraftExhibitionForTeam(teamId: string): Promise<Exhibition | null> {
+  const q = query(exhibitionsRef(), where("teamId", "==", teamId), where("status", "==", "draft"), fbLimit(1));
+  const snap = await getDocs(q);
+  const d = snap.docs[0];
+  return d ? ({ id: d.id, ...d.data() } as Exhibition) : null;
+}
+
 export async function listAllExhibitionsForAdmin(): Promise<Exhibition[]> {
   const q = query(exhibitionsRef(), orderBy("createdAt", "desc"), fbLimit(200));
   const snap = await getDocs(q);

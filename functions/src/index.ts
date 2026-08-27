@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { setGlobalOptions } from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/https";
+import { onSchedule } from "firebase-functions/scheduler";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
 
 setGlobalOptions({ maxInstances: 10 });
 
@@ -270,4 +272,33 @@ export const revokeTempJudgeAccount = onCall(async (request) => {
   }
 
   return { ok: true };
+});
+
+// A team's exhibition doc starts as "draft" and only ever flips to
+// "published" as the very last step of the /exhibitions/new submit flow (see
+// createDraftExhibition / publishExhibitionPages in the web app). If that
+// flow never finishes — network drop mid-upload, browser closed — the doc is
+// orphaned in "draft" forever, since nothing else transitions it and a team
+// can only have one draft at a time (the form resumes into it instead of
+// creating a second one). Sweep these out once they've clearly been
+// abandoned, along with whatever partial page/thumbnail images made it to
+// Storage before the flow died.
+const DRAFT_STALE_MS = 48 * 60 * 60 * 1000;
+
+export const cleanupOrphanedDrafts = onSchedule("every 24 hours", async () => {
+  const db = getFirestore();
+  const cutoff = Date.now() - DRAFT_STALE_MS;
+
+  const snap = await db.collection("exhibitions").where("status", "==", "draft").get();
+  const stale = snap.docs.filter((d) => (d.data().createdAt?.toMillis?.() ?? 0) <= cutoff);
+  if (stale.length === 0) return;
+
+  const bucket = getStorage().bucket();
+  for (const draftDoc of stale) {
+    await bucket.deleteFiles({ prefix: `exhibitions/${draftDoc.id}/` }).catch(() => {
+      // Storage cleanup is best-effort — an orphaned file under a deleted
+      // exhibition's prefix is harmless, just wasted space.
+    });
+    await draftDoc.ref.delete();
+  }
 });

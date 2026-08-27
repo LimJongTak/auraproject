@@ -10,7 +10,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { createTeam, getTeam, subscribeMyMemberships, TeamError } from "@/lib/firestore/teams";
-import { createDraftExhibition, publishExhibitionPages } from "@/lib/firestore/exhibitions";
+import {
+  createDraftExhibition,
+  getDraftExhibitionForTeam,
+  publishExhibitionPages,
+  updateExhibitionMeta,
+} from "@/lib/firestore/exhibitions";
 import { HashtagInput } from "@/components/ui/HashtagInput";
 import { ReferenceLinksFields } from "@/components/exhibitions/ReferenceLinksFields";
 import { renderPdfToImages, validatePdfFile, PdfValidationError, MAX_PDF_PAGES } from "@/lib/pdf/renderPdfToImages";
@@ -22,7 +27,7 @@ import {
 } from "@/lib/storage/uploadExhibitionThumbnail";
 import { exhibitionMetaSchema, type ExhibitionMetaValues } from "@/lib/validation/exhibitionSchema";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
-import type { Category, Team, TeamMembership } from "@/types/models";
+import type { Category, Exhibition, Team, TeamMembership } from "@/types/models";
 import type { LinkPreviewApiResponse } from "@/lib/linkPreview/types";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
@@ -60,11 +65,17 @@ function NewExhibitionForm() {
   const [phase, setPhase] = useState<SubmitPhase>("idle");
   const [progress, setProgress] = useState<{ label: string; percent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // An earlier submission for this team+contest that never reached "published"
+  // (browser closed, network dropped mid-upload, etc.) — see
+  // getDraftExhibitionForTeam. Resuming updates this doc in place instead of
+  // creating a second one.
+  const [resumeDraft, setResumeDraft] = useState<Exhibition | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
+    reset,
     control,
     formState: { errors },
   } = useForm<ExhibitionMetaValues>({
@@ -81,6 +92,37 @@ function NewExhibitionForm() {
     const unsub = subscribeCategories(setCategories);
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!team) {
+      setResumeDraft(null);
+      return;
+    }
+    let cancelled = false;
+    getDraftExhibitionForTeam(team.id).then((draft) => {
+      if (cancelled) return;
+      setResumeDraft(draft);
+      if (draft) {
+        reset({
+          categoryId: draft.categoryId,
+          title: draft.title,
+          oneLiner: draft.oneLiner,
+          projectUrl: draft.projectUrl ?? "",
+          hashtags: draft.hashtags ?? [],
+          referenceLinks: {
+            homepage: draft.referenceLinks?.homepage ?? "",
+            instagram: draft.referenceLinks?.instagram ?? "",
+            youtube: draft.referenceLinks?.youtube ?? "",
+            appStore: draft.referenceLinks?.appStore ?? "",
+            googlePlay: draft.referenceLinks?.googlePlay ?? "",
+          },
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [team, reset]);
 
   useEffect(() => {
     if (!profile?.uid) return;
@@ -214,25 +256,42 @@ function NewExhibitionForm() {
         }
       }
 
-      const exhibitionId = await createDraftExhibition({
-        teamId: submittingTeamId,
-        teamName: submittingTeamName!,
-        categoryId: category.id,
-        categoryName: category.name,
-        title: values.title,
-        oneLiner: values.oneLiner,
-        projectUrl: values.projectUrl || null,
-        linkPreview,
-        hashtags: values.hashtags ?? [],
-        referenceLinks: {
-          homepage: values.referenceLinks?.homepage || null,
-          instagram: values.referenceLinks?.instagram || null,
-          youtube: values.referenceLinks?.youtube || null,
-          appStore: values.referenceLinks?.appStore || null,
-          googlePlay: values.referenceLinks?.googlePlay || null,
-        },
-        submittedByUid: profile!.uid,
-      });
+      const referenceLinks = {
+        homepage: values.referenceLinks?.homepage || null,
+        instagram: values.referenceLinks?.instagram || null,
+        youtube: values.referenceLinks?.youtube || null,
+        appStore: values.referenceLinks?.appStore || null,
+        googlePlay: values.referenceLinks?.googlePlay || null,
+      };
+
+      let exhibitionId: string;
+      if (resumeDraft) {
+        await updateExhibitionMeta(resumeDraft.id, {
+          title: values.title,
+          oneLiner: values.oneLiner,
+          categoryId: category.id,
+          categoryName: category.name,
+          projectUrl: values.projectUrl || null,
+          linkPreview,
+          hashtags: values.hashtags ?? [],
+          referenceLinks,
+        });
+        exhibitionId = resumeDraft.id;
+      } else {
+        exhibitionId = await createDraftExhibition({
+          teamId: submittingTeamId,
+          teamName: submittingTeamName!,
+          categoryId: category.id,
+          categoryName: category.name,
+          title: values.title,
+          oneLiner: values.oneLiner,
+          projectUrl: values.projectUrl || null,
+          linkPreview,
+          hashtags: values.hashtags ?? [],
+          referenceLinks,
+          submittedByUid: profile!.uid,
+        });
+      }
 
       let pageImageUrls: string[] = [];
       let autoThumbnailUrl: string | null = null;
@@ -295,6 +354,12 @@ function NewExhibitionForm() {
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "온라인전시관", href: "/exhibitions" }, { label: "등록" }]} />
       <h1 className="mt-4 text-2xl font-extrabold">전시물 등록</h1>
       <p className="mt-1 text-sm text-muted">{teamName ?? "팀"} 이름으로 등록됩니다.</p>
+
+      {resumeDraft && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          이전에 등록하다가 완료되지 못한 임시저장 글이 있어요. 아래 내용을 이어서 작성해주세요.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 flex flex-col gap-5">
         <Select label="카테고리" {...register("categoryId")} error={errors.categoryId?.message}>
@@ -419,7 +484,7 @@ function NewExhibitionForm() {
         {error && <ErrorText>{error}</ErrorText>}
 
         <Button type="submit" size="lg" loading={busy} disabled={openCategories.length === 0}>
-          {busy ? "등록 중..." : "전시물 등록하기"}
+          {busy ? "등록 중..." : resumeDraft ? "이어서 등록하기" : "전시물 등록하기"}
         </Button>
       </form>
     </div>
