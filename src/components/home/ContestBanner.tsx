@@ -45,6 +45,7 @@ function CountdownRow({
 
 export function ContestBanner({ category }: { category: Category }) {
   const applyRemaining = useCountdownTimer(category.submissionOpenAt.toDate());
+  const closeRemaining = useCountdownTimer(category.submissionCloseAt.toDate());
   const revealRemaining = useCountdownTimer(category.themeRevealAt?.toDate() ?? null);
   const [theme, setTheme] = useState<BannerTheme | null>(null);
 
@@ -94,6 +95,11 @@ export function ContestBanner({ category }: { category: Category }) {
             ) : windowState === "open" ? (
               <motion.div key="apply-open" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <h2 className="mt-2 text-xl font-extrabold sm:text-2xl">지금 신청할 수 있어요</h2>
+                {closeRemaining && !closeRemaining.done && (
+                  <div className="mt-4">
+                    <CountdownRow title="신청 마감까지" remaining={closeRemaining} />
+                  </div>
+                )}
                 <Link href={`/exhibitions/new?categoryId=${category.id}`}>
                   <Button className="mt-4">신청하기</Button>
                 </Link>
