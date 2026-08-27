@@ -122,7 +122,7 @@ export default function SignupPage() {
         <Input
           label="비밀번호"
           type="password"
-          placeholder="6자 이상"
+          placeholder="8자 이상"
           {...register("password")}
           error={errors.password?.message}
         />

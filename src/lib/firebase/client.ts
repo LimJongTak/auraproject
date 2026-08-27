@@ -1,4 +1,5 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { type Auth, getAuth } from "firebase/auth";
 import { type Firestore, getFirestore } from "firebase/firestore";
 import { type FirebaseStorage, getStorage } from "firebase/storage";
@@ -12,6 +13,12 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
+
+// Optional: only set once App Check is registered in the Firebase console
+// (App Check > Apps > this web app > reCAPTCHA v3) — see SETUP.md. Left
+// unset, the app runs exactly as before (App Check enforcement must also be
+// turned on per-product in the console before it actually blocks anything).
+const recaptchaSiteKey = process.env.NEXT_PUBLIC_FIREBASE_RECAPTCHA_SITE_KEY;
 
 // True once real values from a created Firebase project are in .env.local
 // (see SETUP.md). Before that, apiKey etc. are empty strings and Firebase SDK
@@ -37,6 +44,22 @@ const isBrowser = typeof window !== "undefined";
 const canInit = isBrowser && firebaseConfigured;
 
 export const firebaseApp = canInit ? getFirebaseApp() : (undefined as unknown as FirebaseApp);
+
+// Must run before any Firestore/Storage/Functions call so the SDK attaches an
+// App Check token to every request from the start. Debug token lets
+// localhost keep working against the real project without being enrolled as
+// a verified app; register the token it logs on first run under App Check >
+// Apps > Manage debug tokens so local dev isn't blocked once enforcement is on.
+if (canInit && recaptchaSiteKey) {
+  if (process.env.NODE_ENV === "development") {
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  initializeAppCheck(firebaseApp, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
+
 export const auth: Auth = canInit ? getAuth(firebaseApp) : (undefined as unknown as Auth);
 if (canInit) auth.languageCode = "ko";
 export const db: Firestore = canInit ? getFirestore(firebaseApp) : (undefined as unknown as Firestore);

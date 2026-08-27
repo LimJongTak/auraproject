@@ -18,7 +18,11 @@ service cloud.firestore {
 
     // ---------------- users ----------------
     match /users/{uid} {
-      allow get: if isSignedIn();
+      // PII (phone/school/department/grade/studentId/email) lives here, so
+      // reads are owner-or-admin only — no other role has a legitimate reason
+      // to read another user's profile (team/comment/judge UI all display
+      // denormalized names instead of fetching this doc).
+      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow list: if isAdmin();
       allow create: if isSignedIn() && request.auth.uid == uid
                     && request.resource.data.role == 'user';

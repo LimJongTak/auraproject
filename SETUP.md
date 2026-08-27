@@ -60,9 +60,19 @@ npx firebase emulators:start
 
 목록 페이지의 카테고리 필터 + 정렬 조합은 Firestore 복합 색인이 필요합니다. `firestore.indexes.json`에 필요한 색인을 미리 정의해 두었으므로 4번 단계의 배포 명령으로 함께 생성됩니다. 만약 개발 중 콘솔에 "색인이 필요합니다" 에러와 함께 링크가 뜨면, 그 링크를 클릭해 즉시 생성해도 됩니다.
 
-## 7. 알아두면 좋은 점
+## 7. App Check 설정 (선택, 봇/스크래핑 방지 — 권장)
 
-- Cloud Functions는 사용하지 않아 Firebase **Spark(무료) 요금제**로 충분합니다.
+로그인 없이도 읽을 수 있는 데이터(`studentIdIndex`의 학번→이메일 조회 등)를 실제 브라우저가 아닌 스크립트가 대량으로 긁어가는 것을 막아줍니다. 미설정 시에도 앱은 정상 동작하며, 설정 후에도 아래 5번(콘솔 강제 적용)을 켜기 전까지는 아무것도 차단되지 않습니다.
+
+1. Firebase 콘솔 → **App Check** → **앱** → 5번 단계에서 등록한 웹 앱 선택 → **reCAPTCHA v3** 공급자 등록 (reCAPTCHA 사이트 키가 없다면 [Google reCAPTCHA 관리 콘솔](https://www.google.com/recaptcha/admin)에서 v3 키를 먼저 발급)
+2. 발급된 **사이트 키**를 `.env.local`의 `NEXT_PUBLIC_FIREBASE_RECAPTCHA_SITE_KEY`에 채우기
+3. 로컬 개발 중에는 App Check가 디버그 토큰을 콘솔에 한 번 출력합니다 — App Check → 앱 → **디버그 토큰 관리**에 등록해야 로컬에서 차단되지 않습니다
+4. 배포 후 며칠간 App Check 콘솔의 **요청** 탭에서 "검증됨" 비율을 모니터링 — 정상 트래픽이 대부분 검증되는 것을 확인하기 전에는 강제 적용하지 않기
+5. 문제없이 확인되면 App Check → **API** 탭에서 Firestore/Storage/Cloud Functions 각각을 **적용(Enforce)**으로 전환 — 이 순간부터 App Check 토큰이 없는 요청은 실제로 거부됩니다
+
+## 8. 알아두면 좋은 점
+
+- Cloud Functions(관리자 전용 탈퇴 처리, 심사위원 임시 계정 발급 등)를 사용하므로 Firebase **Blaze(종량제) 요금제**가 필요합니다. `functions/` 배포는 `npx firebase deploy --only functions`.
 - 좋아요/댓글 카운터는 클라이언트 트랜잭션 + 보안 규칙(±1 제한)으로 관리되며 완전한 원자성을 100% 보장하진 않습니다. 대회 운영 중 수치가 어긋나는 것이 의심되면 Firestore 콘솔에서 해당 문서를 직접 확인/수정하면 됩니다.
-- `/api/link-preview`는 서버(Edge Route Handler)에서 외부 URL의 OG 메타데이터를 가져오는 용도로, 사설 IP·localhost 등은 요청하지 못하도록 막아뒀습니다.
+- `/api/link-preview`는 서버(Node.js Route Handler)에서 외부 URL의 OG 메타데이터를 가져오는 용도로, 사설 IP·localhost 등은 요청하지 못하도록 막아뒀습니다.
 - 추후 Cloudflare로 배포할 때는 `@opennextjs/cloudflare` 어댑터 설치 및 `wrangler` 설정이 별도로 필요합니다 (이번 단계에는 포함하지 않았습니다).

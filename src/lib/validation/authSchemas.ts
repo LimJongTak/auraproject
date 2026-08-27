@@ -54,7 +54,7 @@ export const signupSchema = z
       .regex(/^[0-9-]{9,14}$/, "올바른 전화번호 형식이 아니에요"),
     ...profileFieldsShape,
     email: z.string().min(1, "이메일을 입력해주세요").email("올바른 이메일 형식이 아니에요"),
-    password: z.string().min(6, "비밀번호는 6자 이상이어야 해요"),
+    password: z.string().min(8, "비밀번호는 8자 이상이어야 해요"),
     passwordConfirm: z.string().min(1, "비밀번호를 다시 입력해주세요"),
   })
   .refine((data) => data.password === data.passwordConfirm, {
@@ -95,7 +95,7 @@ export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "현재 비밀번호를 입력해주세요"),
-    newPassword: z.string().min(6, "새 비밀번호는 6자 이상이어야 해요"),
+    newPassword: z.string().min(8, "새 비밀번호는 8자 이상이어야 해요"),
     newPasswordConfirm: z.string().min(1, "새 비밀번호를 다시 입력해주세요"),
   })
   .refine((data) => data.newPassword === data.newPasswordConfirm, {
@@ -107,7 +107,7 @@ export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().min(6, "새 비밀번호는 6자 이상이어야 해요"),
+    newPassword: z.string().min(8, "새 비밀번호는 8자 이상이어야 해요"),
     newPasswordConfirm: z.string().min(1, "새 비밀번호를 다시 입력해주세요"),
   })
   .refine((data) => data.newPassword === data.newPasswordConfirm, {

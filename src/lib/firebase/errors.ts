@@ -1,7 +1,7 @@
 const MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "이미 가입된 이메일이에요",
   "auth/invalid-email": "올바른 이메일 형식이 아니에요",
-  "auth/weak-password": "비밀번호는 6자 이상이어야 해요",
+  "auth/weak-password": "비밀번호는 8자 이상이어야 해요",
   "auth/user-not-found": "가입되지 않은 계정이에요",
   "auth/wrong-password": "비밀번호가 올바르지 않아요",
   "auth/invalid-credential": "학번/사번 또는 비밀번호가 올바르지 않아요",
