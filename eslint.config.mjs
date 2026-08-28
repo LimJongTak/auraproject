@@ -24,6 +24,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored pdf.js worker bundle, not source we own/lint.
     "public/pdf.worker.min.mjs",
+    // Compiled Cloud Functions output (gitignored build artifact).
+    "functions/lib/**",
+    // Firebase Data Connect codegen, not hand-authored.
+    "src/dataconnect-generated/**",
   ]),
 ]);
 
