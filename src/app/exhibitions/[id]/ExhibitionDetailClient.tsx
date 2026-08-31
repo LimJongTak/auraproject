@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Trash2, Trophy } from "lucide-react";
+import { Heart, Pencil, Trash2, Trophy } from "lucide-react";
 import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
 import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
@@ -92,6 +92,11 @@ export function ExhibitionDetailClient() {
           {exhibition.award && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
               <Trophy size={12} /> {exhibition.award.label}
+            </span>
+          )}
+          {exhibition.popularAwardRank && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+              <Heart size={12} /> 인기상
             </span>
           )}
         </div>

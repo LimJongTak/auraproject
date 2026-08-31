@@ -72,6 +72,16 @@ export interface Category {
   // Judging rubric, written by the admin when opening the contest. Items are
   // scored individually by judges — see Evaluation below.
   rubric: RubricItem[];
+  // Popularity award (인기상), auto-assigned by likeCount ranking instead of
+  // judged — see assignPopularAwards in functions/src/index.ts. 0 disables
+  // it for this contest. popularAwardCloseAt is the tally deadline; the
+  // banner counts down to it (see ContestBanner). popularAwardAssignedAt is
+  // set by the scheduled function once ranks are handed out, so it never
+  // re-runs (and re-ranks by whatever likeCount looks like later) for the
+  // same contest — it's bookkeeping only and isn't exposed in the admin form.
+  popularAwardCount: number;
+  popularAwardCloseAt: Timestamp | null;
+  popularAwardAssignedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -129,6 +139,11 @@ export interface Exhibition {
   // Set by an admin after judging closes. Shown on MyPage and wherever the
   // exhibition itself is already publicly visible.
   award: { label: string; rank: number } | null;
+  // Auto-assigned by assignPopularAwards once a contest's popular-award tally
+  // period ends — 1-indexed rank among that contest's likeCount leaders, null
+  // if not a winner. Separate from `award` so a judged prize and the
+  // popularity award can coexist on the same exhibition.
+  popularAwardRank: number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -47,6 +47,7 @@ export function ContestBanner({ category }: { category: Category }) {
   const applyRemaining = useCountdownTimer(category.submissionOpenAt.toDate());
   const closeRemaining = useCountdownTimer(category.submissionCloseAt.toDate());
   const revealRemaining = useCountdownTimer(category.themeRevealAt?.toDate() ?? null);
+  const popularAwardRemaining = useCountdownTimer(category.popularAwardCloseAt?.toDate() ?? null);
   const [theme, setTheme] = useState<BannerTheme | null>(null);
 
   useEffect(() => {
@@ -107,6 +108,11 @@ export function ContestBanner({ category }: { category: Category }) {
             ) : (
               <motion.div key="apply-closed" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <h2 className="mt-2 text-xl font-extrabold sm:text-2xl">접수가 마감됐어요</h2>
+                {popularAwardRemaining && !popularAwardRemaining.done && (
+                  <div className="mt-4">
+                    <CountdownRow title="인기상 집계기간" remaining={popularAwardRemaining} />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

@@ -53,6 +53,7 @@ export async function createDraftExhibition(input: NewExhibitionInput): Promise<
     status: "draft" as ExhibitionStatus,
     submittedByUid: input.submittedByUid,
     award: null,
+    popularAwardRank: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

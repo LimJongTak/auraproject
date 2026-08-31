@@ -21,6 +21,10 @@ function toLocalInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function formatDate(d: Date): string {
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function formatTeamSize(min: number | undefined, max: number | null | undefined): string {
   const lo = min ?? 1;
   if (max != null && max === lo) return `${lo}명`;
@@ -95,6 +99,12 @@ export default function AdminCategoriesPage() {
                   {c.description && <p className="mt-1 text-sm text-muted">{c.description}</p>}
                   <p className="mt-1 text-xs text-muted">{formatDateRange(c.submissionOpenAt, c.submissionCloseAt)}</p>
                   <p className="mt-1 text-xs text-muted">팀 인원 {formatTeamSize(c.teamSizeMin, c.teamSizeMax)}</p>
+                  {c.popularAwardCount > 0 && c.popularAwardCloseAt && (
+                    <p className="mt-1 text-xs text-muted">
+                      인기상 {c.popularAwardCount}명 · 집계 마감 {formatDate(c.popularAwardCloseAt.toDate())}
+                      {c.popularAwardAssignedAt && " · 부여 완료"}
+                    </p>
+                  )}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
@@ -139,6 +149,10 @@ function CategoryForm({
   const [teamSizeMin, setTeamSizeMin] = useState(String(initial?.teamSizeMin ?? 1));
   const [teamSizeMax, setTeamSizeMax] = useState(initial?.teamSizeMax != null ? String(initial.teamSizeMax) : "");
   const [baseMileage, setBaseMileage] = useState(String(initial?.baseMileage ?? 0));
+  const [popularAwardCount, setPopularAwardCount] = useState(String(initial?.popularAwardCount ?? 0));
+  const [popularAwardCloseAt, setPopularAwardCloseAt] = useState(() =>
+    initial?.popularAwardCloseAt ? toLocalInputValue(initial.popularAwardCloseAt.toDate()) : ""
+  );
   const [rubric, setRubric] = useState<RubricItem[]>(initial?.rubric ?? []);
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(initial?.bannerImageUrl ?? null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -232,6 +246,11 @@ function CategoryForm({
       setError("평가표 문항은 세부 항목과 배점(1점 이상)을 모두 입력해야 해요");
       return;
     }
+    const popularCount = Math.max(0, parseInt(popularAwardCount, 10) || 0);
+    if (popularCount > 0 && !popularAwardCloseAt) {
+      setError("인기상 지정수를 설정했다면 집계 마감일도 입력해야 해요");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const input: CategoryInput = {
@@ -249,6 +268,8 @@ function CategoryForm({
       thumbnailUrl,
       baseMileage: Math.max(0, parseInt(baseMileage, 10) || 0),
       rubric: rubric.map((r) => ({ ...r, label: r.label.trim(), criteria: r.criteria.trim(), group: r.group.trim() })),
+      popularAwardCount: popularCount,
+      popularAwardCloseAt: popularCount > 0 && popularAwardCloseAt ? new Date(popularAwardCloseAt) : null,
     };
     try {
       if (initial) {
@@ -336,6 +357,29 @@ function CategoryForm({
         value={baseMileage}
         onChange={(e) => setBaseMileage(e.target.value)}
       />
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+        <span className="text-sm font-semibold">인기상 (선택 — 좋아요 순위로 자동 부여돼요)</span>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label="인기상 지정수 (0이면 인기상 없음)"
+            type="number"
+            min={0}
+            value={popularAwardCount}
+            onChange={(e) => setPopularAwardCount(e.target.value)}
+          />
+          <Input
+            label="인기상 집계 마감"
+            type="datetime-local"
+            value={popularAwardCloseAt}
+            onChange={(e) => setPopularAwardCloseAt(e.target.value)}
+          />
+        </div>
+        <p className="text-xs text-muted">
+          집계 마감일이 지나면 이 대회의 게시된 전시물 중 좋아요 수 상위 {Math.max(0, parseInt(popularAwardCount, 10) || 0)}팀에게
+          자동으로 인기상 뱃지가 부여돼요. 마감 전까지는 홈 배너에 인기상 집계기간 카운트다운이 표시돼요.
+        </p>
+      </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between">

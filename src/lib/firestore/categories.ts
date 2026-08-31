@@ -43,6 +43,8 @@ export interface CategoryInput {
   thumbnailUrl: string | null;
   baseMileage: number;
   rubric: RubricItem[];
+  popularAwardCount: number;
+  popularAwardCloseAt: Date | null;
 }
 
 export async function createCategory(input: CategoryInput) {
@@ -61,6 +63,9 @@ export async function createCategory(input: CategoryInput) {
     thumbnailUrl: input.thumbnailUrl,
     baseMileage: input.baseMileage,
     rubric: input.rubric,
+    popularAwardCount: input.popularAwardCount,
+    popularAwardCloseAt: input.popularAwardCloseAt ? Timestamp.fromDate(input.popularAwardCloseAt) : null,
+    popularAwardAssignedAt: null,
     themeRevealAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -83,6 +88,8 @@ export async function updateCategory(id: string, input: CategoryInput) {
     thumbnailUrl: input.thumbnailUrl,
     baseMileage: input.baseMileage,
     rubric: input.rubric,
+    popularAwardCount: input.popularAwardCount,
+    popularAwardCloseAt: input.popularAwardCloseAt ? Timestamp.fromDate(input.popularAwardCloseAt) : null,
     updatedAt: serverTimestamp(),
   });
 }

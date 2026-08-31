@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy } from "lucide-react";
+import { Heart, Trophy } from "lucide-react";
 import type { Exhibition } from "@/types/models";
 import { HashtagBadges } from "@/components/exhibitions/HashtagBadges";
 
@@ -8,11 +8,18 @@ export function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
   return (
     <Link href={`/exhibitions/${exhibition.id}`} className="group flex flex-col gap-3">
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-surface transition group-hover:shadow-lg">
-        {exhibition.award && (
-          <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-amber-950 shadow">
-            <Trophy size={12} /> {exhibition.award.label}
-          </span>
-        )}
+        <div className="absolute left-2 top-2 z-10 flex flex-wrap gap-1.5">
+          {exhibition.award && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-amber-950 shadow">
+              <Trophy size={12} /> {exhibition.award.label}
+            </span>
+          )}
+          {exhibition.popularAwardRank && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-2.5 py-1 text-xs font-bold text-rose-950 shadow">
+              <Heart size={12} /> 인기상
+            </span>
+          )}
+        </div>
         {exhibition.thumbnailUrl ? (
           <Image
             src={exhibition.thumbnailUrl}

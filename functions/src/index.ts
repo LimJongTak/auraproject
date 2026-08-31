@@ -345,3 +345,52 @@ export const cleanupOrphanedDrafts = onSchedule("every 24 hours", async () => {
     await draftDoc.ref.delete();
   }
 });
+
+interface CategoryAwardData {
+  popularAwardCount?: number;
+  popularAwardCloseAt?: FirebaseFirestore.Timestamp | null;
+  popularAwardAssignedAt?: FirebaseFirestore.Timestamp | null;
+}
+
+// Once a contest's popular-award tally period (Category.popularAwardCloseAt)
+// ends, ranks its published exhibitions by likeCount and stamps the top
+// popularAwardCount of them with a rank — see Exhibition.popularAwardRank
+// and ContestBanner's "인기상 집계기간" countdown on the web app. Guarded by
+// popularAwardAssignedAt so a contest is only ever ranked once, even though
+// this runs on a recurring schedule — otherwise a later run would re-rank by
+// whatever likeCount looks like at that point instead of at the deadline.
+export const assignPopularAwards = onSchedule("every 15 minutes", async () => {
+  const db = getFirestore();
+  const now = Date.now();
+
+  const categoriesSnap = await db.collection("categories").get();
+  const due = categoriesSnap.docs.filter((d) => {
+    const c = d.data() as CategoryAwardData;
+    return (c.popularAwardCount ?? 0) > 0 &&
+      !c.popularAwardAssignedAt &&
+      !!c.popularAwardCloseAt &&
+      c.popularAwardCloseAt.toMillis() <= now;
+  });
+  if (due.length === 0) return;
+
+  for (const categoryDoc of due) {
+    const category = categoryDoc.data() as CategoryAwardData;
+    const count = category.popularAwardCount ?? 0;
+
+    const winnersSnap = await db.collection("exhibitions")
+      .where("categoryId", "==", categoryDoc.id)
+      .where("status", "==", "published")
+      .orderBy("likeCount", "desc")
+      .limit(count)
+      .get();
+
+    const batch = db.batch();
+    winnersSnap.docs.forEach((winnerDoc, index) => {
+      batch.update(winnerDoc.ref, {popularAwardRank: index + 1});
+    });
+    batch.update(categoryDoc.ref, {
+      popularAwardAssignedAt: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+});

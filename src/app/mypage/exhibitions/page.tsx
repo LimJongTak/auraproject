@@ -100,6 +100,11 @@ export default function MyExhibitionsPage() {
                         <Trophy size={12} /> {e.award.label}
                       </span>
                     )}
+                    {e.popularAwardRank && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                        <Heart size={12} /> 인기상
+                      </span>
+                    )}
                     {e.status === "draft" && (
                       <button
                         type="button"
