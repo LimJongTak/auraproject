@@ -113,7 +113,12 @@ service cloud.firestore {
     // account issuer (issueJudgeAccounts Cloud Function, which uses the
     // Admin SDK and so bypasses these rules entirely).
     match /judgeAssignments/{assignmentId} {
-      allow get: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      // Same not-yet-created case as evaluations below: the judge screen
+      // get()s this exact doc to check "am I assigned to this contest?", and
+      // for a judge who isn't, the doc doesn't exist — resource is null, so
+      // resource.data.uid errors instead of just failing the equality check.
+      // Nothing is exposed by letting the not-found case through.
+      allow get: if resource == null ? isSignedIn() : (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow create, delete: if isAdmin();
       allow update: if false;
@@ -281,7 +286,21 @@ service cloud.firestore {
     // where('categoryId','==', ...) (same "provably true per result" pattern
     // as exhibitions/inquiries above), which every query in evaluations.ts does.
     match /evaluations/{evalId} {
-      allow get: if canJudge(resource.data.categoryId);
+      // A judge's own evaluation doc doesn't exist until they save their
+      // first score, but the app always get()s/onSnapshot()s this exact path
+      // to check for one (e.g. the exhibition page's floating score panel) —
+      // so this must also allow the not-yet-created case. `resource` is null
+      // then, and `resource.data.categoryId` on a null resource errors out
+      // rather than reading as missing; canJudge()'s `||` only survives that
+      // error when the other side alone is true, which for a non-admin judge
+      // it isn't — so without this branch every judge (never admins, since
+      // isAdmin() alone satisfies the OR) got permission-denied on every
+      // exhibition they hadn't already scored, and the panel hung forever on
+      // "불러오는 중...". No score exists yet either way, so nothing is
+      // exposed by allowing the read through here.
+      allow get: if resource == null
+        ? isSignedIn() && (isAdmin() || myProfile().role == 'judge')
+        : canJudge(resource.data.categoryId);
       allow list: if canJudge(resource.data.categoryId);
       allow create: if canJudge(request.resource.data.categoryId)
         && request.resource.data.judgeUid == request.auth.uid

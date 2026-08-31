@@ -43,9 +43,20 @@ export function subscribeMyEvaluation(
   exhibitionId: string,
   cb: (evaluation: Evaluation | null) => void
 ) {
-  return onSnapshot(doc(db, "evaluations", evalId(judgeUid, exhibitionId)), (snap) => {
-    cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Evaluation) : null);
-  });
+  return onSnapshot(
+    doc(db, "evaluations", evalId(judgeUid, exhibitionId)),
+    (snap) => {
+      cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Evaluation) : null);
+    },
+    (err) => {
+      // Surface a stuck permission-denied instead of leaving the caller's
+      // "loading" state hanging forever with no signal (see the evaluations
+      // get-rule note in firestore.rules for why this used to happen for
+      // every judge on their first look at an unscored exhibition).
+      console.error("subscribeMyEvaluation failed", err);
+      cb(null);
+    }
+  );
 }
 
 // Live list of every judge's evaluations for a contest — used by the judge

@@ -45,7 +45,9 @@ function JudgeCategoryDetail() {
 
   useEffect(() => {
     if (!profile || profile.role !== "judge") return;
-    getAssignment(profile.uid, params.categoryId).then(setMyAssignment);
+    getAssignment(profile.uid, params.categoryId)
+      .then(setMyAssignment)
+      .catch(() => setMyAssignment(null));
   }, [profile, params.categoryId]);
 
   useEffect(() => {
