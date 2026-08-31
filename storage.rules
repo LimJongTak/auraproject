@@ -17,7 +17,7 @@ service firebase.storage {
 
     match /exhibitions/{exhibitionId}/pages/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && isTeamMemberOf(exhibitionId)
+      allow write: if isSignedIn() && (isTeamMemberOf(exhibitionId) || isAdmin())
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|webp|png)');
     }

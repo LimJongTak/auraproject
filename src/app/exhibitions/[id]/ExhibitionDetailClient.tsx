@@ -11,7 +11,7 @@ import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
 import type { Exhibition } from "@/types/models";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge, Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
-import { LinkPreviewCard } from "@/components/link-preview/LinkPreviewCard";
+import { LinkPreviewCard, LinkPreviewFallback } from "@/components/link-preview/LinkPreviewCard";
 import { LikeButton } from "@/components/exhibitions/LikeButton";
 import { CommentSection } from "@/components/exhibitions/CommentSection";
 import { PdfPageScroller } from "@/components/exhibitions/PdfPageScroller";
@@ -131,16 +131,20 @@ export function ExhibitionDetailClient() {
         <HashtagBadges hashtags={exhibition.hashtags ?? []} />
       </div>
 
-      {exhibition.projectUrl && exhibition.linkPreview && (
+      {exhibition.projectUrl && (
         <div className="mt-6">
-          <LinkPreviewCard
-            url={exhibition.projectUrl}
-            title={exhibition.linkPreview.title}
-            description={exhibition.linkPreview.description}
-            image={exhibition.linkPreview.image}
-            favicon={exhibition.linkPreview.favicon}
-            domain={exhibition.linkPreview.domain}
-          />
+          {exhibition.linkPreview ? (
+            <LinkPreviewCard
+              url={exhibition.projectUrl}
+              title={exhibition.linkPreview.title}
+              description={exhibition.linkPreview.description}
+              image={exhibition.linkPreview.image}
+              favicon={exhibition.linkPreview.favicon}
+              domain={exhibition.linkPreview.domain}
+            />
+          ) : (
+            <LinkPreviewFallback url={exhibition.projectUrl} />
+          )}
         </div>
       )}
 

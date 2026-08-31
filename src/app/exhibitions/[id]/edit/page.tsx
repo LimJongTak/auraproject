@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { UploadCloud, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/auth/Guard";
-import { getExhibition, updateExhibitionMeta } from "@/lib/firestore/exhibitions";
+import { getExhibition, updateExhibitionMeta, updateExhibitionPages } from "@/lib/firestore/exhibitions";
 import { HashtagInput } from "@/components/ui/HashtagInput";
 import { ReferenceLinksFields } from "@/components/exhibitions/ReferenceLinksFields";
 import { getCategory } from "@/lib/firestore/categories";
@@ -18,6 +19,8 @@ import {
   validateThumbnailImage,
   ThumbnailValidationError,
 } from "@/lib/storage/uploadExhibitionThumbnail";
+import { renderPdfToImages, validatePdfFile, PdfValidationError, MAX_PDF_PAGES } from "@/lib/pdf/renderPdfToImages";
+import { uploadExhibitionPageImages } from "@/lib/storage/uploadExhibitionPages";
 import type { Exhibition } from "@/types/models";
 import type { LinkPreviewApiResponse } from "@/lib/linkPreview/types";
 import { Input, Textarea } from "@/components/ui/Field";
@@ -46,6 +49,13 @@ function EditExhibitionForm() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfProgress, setPdfProgress] = useState<{ label: string; percent: number } | null>(null);
+  const [replacingPdf, setReplacingPdf] = useState(false);
+  const [pdfReplaced, setPdfReplaced] = useState(false);
+
+  const isAdmin = profile?.role === "admin";
 
   const {
     register,
@@ -97,6 +107,53 @@ function EditExhibitionForm() {
       setThumbnailError("이미지 업로드에 실패했어요");
     } finally {
       setUploadingThumbnail(false);
+    }
+  }
+
+  function handlePdfFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setPdfError(null);
+    setPdfReplaced(false);
+    if (!f) {
+      setPdfFile(null);
+      return;
+    }
+    try {
+      validatePdfFile(f);
+      setPdfFile(f);
+    } catch (err) {
+      setPdfFile(null);
+      setPdfError(err instanceof PdfValidationError ? err.message : "PDF 파일을 확인해주세요");
+    }
+  }
+
+  async function handleReplacePdf() {
+    if (!pdfFile || !exhibition) return;
+    setPdfError(null);
+    setReplacingPdf(true);
+    try {
+      const { pages } = await renderPdfToImages(pdfFile, (p) => {
+        setPdfProgress({ label: `PDF 변환 중 (${p.currentPage}/${p.totalPages}페이지)`, percent: (p.currentPage / p.totalPages) * 100 });
+      });
+      const uploaded = await uploadExhibitionPageImages(exhibition.id, pages, (p) => {
+        setPdfProgress({ label: "이미지 업로드 중", percent: (p.bytesTransferred / p.totalBytes) * 100 });
+      });
+      await updateExhibitionPages(exhibition.id, {
+        pageImageUrls: uploaded.pageImageUrls,
+        pageCount: uploaded.pageImageUrls.length,
+      });
+      setExhibition({
+        ...exhibition,
+        pageImageUrls: uploaded.pageImageUrls,
+        pageCount: uploaded.pageImageUrls.length,
+      });
+      setPdfFile(null);
+      setPdfProgress(null);
+      setPdfReplaced(true);
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : "PDF 교체 중 문제가 발생했어요");
+    } finally {
+      setReplacingPdf(false);
     }
   }
 
@@ -189,7 +246,53 @@ function EditExhibitionForm() {
         items={[{ label: "홈", href: "/" }, { label: "온라인전시관", href: "/exhibitions" }, { label: "수정" }]}
       />
       <h1 className="mt-4 text-2xl font-extrabold">전시물 수정</h1>
-      <p className="mt-1 text-sm text-muted">PDF 자료는 수정할 수 없어요. 새로 등록해주세요.</p>
+      <p className="mt-1 text-sm text-muted">
+        {isAdmin ? "PDF 자료는 아래에서 교체할 수 있어요." : "PDF 자료는 수정할 수 없어요. 새로 등록해주세요."}
+      </p>
+
+      {isAdmin && (
+        <div className="mt-6 flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4">
+          <span className="text-sm font-semibold">발표자료 PDF 교체 (관리자 전용)</span>
+          <span className="text-xs text-muted">
+            현재 {exhibition.pageCount}페이지가 등록되어 있어요. 새 PDF를 업로드하면 전체 페이지가 교체돼요. 대표 이미지는 바뀌지 않아요.
+          </span>
+          <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-white px-4 py-8 text-center transition hover:border-primary">
+            <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfFileChange} />
+            {pdfFile ? (
+              <span className="flex items-center gap-2 font-medium text-foreground">
+                <FileText size={18} /> {pdfFile.name}
+              </span>
+            ) : (
+              <>
+                <UploadCloud size={24} className="text-muted" />
+                <span className="text-sm text-muted">PDF 파일을 선택하세요 (최대 50MB, {MAX_PDF_PAGES}페이지)</span>
+              </>
+            )}
+          </label>
+          {pdfError && <span className="text-xs font-medium text-red-600">{pdfError}</span>}
+          {pdfReplaced && <span className="text-xs font-medium text-green-600">PDF가 교체되었어요.</span>}
+          {pdfProgress && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted">{pdfProgress.label}</span>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.min(100, pdfProgress.percent)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <Button
+            type="button"
+            className="mt-2 self-start"
+            disabled={!pdfFile}
+            loading={replacingPdf}
+            onClick={handleReplacePdf}
+          >
+            PDF 교체
+          </Button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 flex flex-col gap-5">
         <input type="hidden" {...register("categoryId")} />

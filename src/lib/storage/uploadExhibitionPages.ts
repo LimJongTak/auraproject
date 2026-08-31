@@ -34,13 +34,40 @@ async function uploadOne(
   return getDownloadURL(storageRef);
 }
 
+async function uploadPageImages(
+  exhibitionId: string,
+  pages: RenderedPage[],
+  bytesPerFile: Map<string, number>,
+  reportProgress: () => void
+): Promise<string[]> {
+  const pageImageUrls: string[] = new Array(pages.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < pages.length) {
+      const page = pages[cursor++];
+      const key = `page-${page.index}`;
+      const path = `exhibitions/${exhibitionId}/pages/${String(page.index).padStart(3, "0")}.${extFromContentType(
+        page.contentType
+      )}`;
+      const url = await uploadOne(exhibitionId, path, page.blob, page.contentType, (bytes) => {
+        bytesPerFile.set(key, bytes);
+        reportProgress();
+      });
+      pageImageUrls[page.index] = url;
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, pages.length) }, () => worker());
+  await Promise.all(workers);
+  return pageImageUrls;
+}
+
 export async function uploadExhibitionPages(
   exhibitionId: string,
   pages: RenderedPage[],
   thumbnail: { blob: Blob; contentType: string },
   onProgress?: (progress: UploadProgress) => void
 ): Promise<{ pageImageUrls: string[]; thumbnailUrl: string }> {
-  const pageImageUrls: string[] = new Array(pages.length);
   const bytesPerFile = new Map<string, number>();
   const totalBytes = pages.reduce((sum, p) => sum + p.blob.size, 0) + thumbnail.blob.size;
 
@@ -61,24 +88,29 @@ export async function uploadExhibitionPages(
     }
   );
 
-  let cursor = 0;
-  async function worker() {
-    while (cursor < pages.length) {
-      const page = pages[cursor++];
-      const key = `page-${page.index}`;
-      const path = `exhibitions/${exhibitionId}/pages/${String(page.index).padStart(3, "0")}.${extFromContentType(
-        page.contentType
-      )}`;
-      const url = await uploadOne(exhibitionId, path, page.blob, page.contentType, (bytes) => {
-        bytesPerFile.set(key, bytes);
-        reportProgress();
-      });
-      pageImageUrls[page.index] = url;
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(CONCURRENCY, pages.length) }, () => worker());
-  const [thumbnailUrl] = await Promise.all([thumbnailPromise, ...workers]);
+  const [thumbnailUrl, pageImageUrls] = await Promise.all([
+    thumbnailPromise,
+    uploadPageImages(exhibitionId, pages, bytesPerFile, reportProgress),
+  ]);
 
   return { pageImageUrls, thumbnailUrl };
+}
+
+// Replaces only the rendered page images for an existing exhibition (e.g. an
+// admin swapping in a corrected PDF) — leaves the thumbnail untouched.
+export async function uploadExhibitionPageImages(
+  exhibitionId: string,
+  pages: RenderedPage[],
+  onProgress?: (progress: UploadProgress) => void
+): Promise<{ pageImageUrls: string[] }> {
+  const bytesPerFile = new Map<string, number>();
+  const totalBytes = pages.reduce((sum, p) => sum + p.blob.size, 0);
+
+  function reportProgress() {
+    const transferred = Array.from(bytesPerFile.values()).reduce((a, b) => a + b, 0);
+    onProgress?.({ bytesTransferred: transferred, totalBytes });
+  }
+
+  const pageImageUrls = await uploadPageImages(exhibitionId, pages, bytesPerFile, reportProgress);
+  return { pageImageUrls };
 }

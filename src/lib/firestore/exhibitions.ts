@@ -72,6 +72,17 @@ export async function publishExhibitionPages(
   });
 }
 
+export async function updateExhibitionPages(
+  id: string,
+  data: { pageImageUrls: string[]; pageCount: number }
+) {
+  await updateDoc(doc(db, "exhibitions", id), {
+    pageImageUrls: data.pageImageUrls,
+    pageCount: data.pageCount,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function updateExhibitionMeta(
   id: string,
   data: {
