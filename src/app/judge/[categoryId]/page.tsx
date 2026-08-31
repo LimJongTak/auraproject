@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink, PlayCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
 import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { getAssignment } from "@/lib/firestore/judgeAssignments";
-import { RubricScoreForm } from "@/components/judge/RubricScoreForm";
 import { ScoreSheetExcelPanel } from "@/components/judge/ScoreSheetExcelPanel";
 import { JudgeAssignmentPanel } from "@/components/admin/JudgeAssignmentPanel";
 import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
@@ -34,7 +33,6 @@ function JudgeCategoryDetail() {
   const [category, setCategory] = useState<Category | null | undefined>(undefined);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [evaluations, setEvaluations] = useState<Evaluation[] | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   // Only meaningful for role == 'judge' — undefined while loading, null once
   // confirmed the caller isn't assigned to this contest. Admins skip this
   // check entirely (see the gate below).
@@ -92,12 +90,35 @@ function JudgeCategoryDetail() {
   }
 
   const rubric = category.rubric ?? [];
+  const scoredCount = exhibitions.filter((ex) => myEvalByExhibition.has(ex.id)).length;
+  const nextUnscored = exhibitions.find((ex) => !myEvalByExhibition.has(ex.id));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "평가", href: "/judge" }, { label: category.name }]} />
-      <h1 className="mt-4 text-2xl font-extrabold">{category.name} 평가</h1>
-      <p className="mt-1 text-sm text-muted">제출작 {exhibitions.length}개</p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold">{category.name} 평가</h1>
+          <p className="mt-1 text-sm text-muted">
+            제출작 {exhibitions.length}개 · 채점 {scoredCount}/{exhibitions.length}
+          </p>
+        </div>
+        {rubric.length > 0 && exhibitions.length > 0 && (
+          <Link href={`/judge/${category.id}/${(nextUnscored ?? exhibitions[0]).id}`}>
+            <Button size="sm">
+              <PlayCircle size={15} /> {scoredCount === 0 ? "심사 시작하기" : nextUnscored ? "이어서 심사하기" : "채점 결과 보기"}
+            </Button>
+          </Link>
+        )}
+      </div>
+      {exhibitions.length > 0 && (
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${(scoredCount / exhibitions.length) * 100}%` }}
+          />
+        </div>
+      )}
 
       {rubric.length > 0 && exhibitions.length > 0 && (
         <ScoreSheetExcelPanel
@@ -122,60 +143,40 @@ function JudgeCategoryDetail() {
           {exhibitions.map((ex) => {
             const myEval = myEvalByExhibition.get(ex.id) ?? null;
             return (
-              <li key={ex.id} className="rounded-2xl border border-border bg-white p-4">
-                <div className="flex w-full items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="truncate font-bold">{ex.title}</p>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <p className="text-sm text-muted">{ex.teamName}</p>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                          myEval ? "bg-primary-light text-primary-dark" : "bg-surface text-muted"
-                        )}
-                      >
-                        {myEval ? `채점완료 · ${myEval.totalScore}점` : "미채점"}
-                      </span>
-                    </div>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <Link
-                      href={`/exhibitions/${ex.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
-                    >
-                      <ExternalLink size={13} /> 작품 보기
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId((cur) => (cur === ex.id ? null : ex.id))}
-                      aria-label={expandedId === ex.id ? "접기" : "펼치기"}
-                    >
-                      {expandedId === ex.id ? (
-                        <ChevronUp size={18} className="shrink-0 text-muted" />
-                      ) : (
-                        <ChevronDown size={18} className="shrink-0 text-muted" />
+              <li
+                key={ex.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"
+              >
+                <Link href={`/judge/${category.id}/${ex.id}`} className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{ex.title}</p>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <p className="text-sm text-muted">{ex.teamName}</p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                        myEval ? "bg-primary-light text-primary-dark" : "bg-surface text-muted"
                       )}
-                    </button>
+                    >
+                      {myEval ? `채점완료 · ${myEval.totalScore}점` : "미채점"}
+                    </span>
                   </div>
+                </Link>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Link
+                    href={`/exhibitions/${ex.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                  >
+                    <ExternalLink size={13} /> 작품 보기
+                  </Link>
+                  <Link
+                    href={`/judge/${category.id}/${ex.id}`}
+                    className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-dark"
+                  >
+                    심사하기 <ArrowRight size={13} />
+                  </Link>
                 </div>
-                {expandedId === ex.id && (
-                  <div className="mt-4 border-t border-border pt-4">
-                    <RubricScoreForm
-                      exhibitionId={ex.id}
-                      categoryId={category.id}
-                      rubric={rubric}
-                      judgeUid={profile.uid}
-                      judgeName={profile.name}
-                      initial={myEval}
-                    />
-                  </div>
-                )}
               </li>
             );
           })}
