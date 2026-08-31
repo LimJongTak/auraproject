@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Trophy } from "lucide-react";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import type { Category, Exhibition, ExhibitionSearchType, SortOption } from "@/types/models";
@@ -44,6 +44,7 @@ function ExhibitionsPageInner() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [sort, setSort] = useState<SortOption>("latest");
+  const [awardOnly, setAwardOnly] = useState(false);
   const [searchType, setSearchType] = useState<ExhibitionSearchType>(
     (searchParams.get("searchType") as ExhibitionSearchType) || "all"
   );
@@ -71,10 +72,18 @@ function ExhibitionsPageInner() {
       .finally(() => setLoading(false));
   }, [categoryId, sort]);
 
+  const hasAwards = useMemo(() => exhibitions.some((e) => e.award || e.popularAwardRank), [exhibitions]);
+
+  useEffect(() => {
+    if (!hasAwards) setAwardOnly(false);
+  }, [hasAwards]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return exhibitions.filter((e) => matchesSearch(e, searchType, term));
-  }, [exhibitions, search, searchType]);
+    return exhibitions
+      .filter((e) => matchesSearch(e, searchType, term))
+      .filter((e) => !awardOnly || e.award || e.popularAwardRank);
+  }, [exhibitions, search, searchType, awardOnly]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -123,6 +132,18 @@ function ExhibitionsPageInner() {
           ))}
         </div>
 
+        {hasAwards && (
+          <button
+            onClick={() => setAwardOnly((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition",
+              awardOnly ? "bg-amber-400 text-amber-950" : "bg-surface text-muted hover:text-foreground"
+            )}
+          >
+            <Trophy size={14} /> 수상작만
+          </button>
+        )}
+
         <ExhibitionSearchBar
           searchType={searchType}
           onSearchTypeChange={setSearchType}
@@ -139,7 +160,10 @@ function ExhibitionsPageInner() {
       </div>
 
       {!loading && filtered.length === 0 && (
-        <EmptyState title="등록된 전시물이 없어요" description="가장 먼저 프로젝트를 등록해보세요." />
+        <EmptyState
+          title={awardOnly ? "조건에 맞는 수상작이 없어요" : "등록된 전시물이 없어요"}
+          description={awardOnly ? "다른 카테고리를 선택하거나 필터를 해제해보세요." : "가장 먼저 프로젝트를 등록해보세요."}
+        />
       )}
     </div>
   );
