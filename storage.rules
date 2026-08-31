@@ -21,15 +21,23 @@ service firebase.storage {
       return isSignedIn() && firestore.exists(membershipPath) && firestore.get(membershipPath).data.teamId == ex.teamId;
     }
 
+    // isAdmin() is checked with `? true :` rather than `|| isAdmin()` on
+    // purpose — a plain `isTeamMemberOf(...) || isAdmin()` still relies on an
+    // admin-caused error inside isTeamMemberOf() (no teamMemberships doc,
+    // since admins never join a team) being silently absorbed by the OR, and
+    // that didn't reliably happen here even after guarding the missing-doc
+    // case with firestore.exists(). The ternary is a real short-circuit —
+    // isTeamMemberOf() is never invoked at all once isAdmin() is true, so it
+    // can't matter whether it would have errored.
     match /exhibitions/{exhibitionId}/pages/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && (isTeamMemberOf(exhibitionId) || isAdmin())
+      allow write: if isSignedIn() && (isAdmin() ? true : isTeamMemberOf(exhibitionId))
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|webp|png)');
     }
     match /exhibitions/{exhibitionId}/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && (isTeamMemberOf(exhibitionId) || isAdmin())
+      allow write: if isSignedIn() && (isAdmin() ? true : isTeamMemberOf(exhibitionId))
                    && fileName.matches('thumbnail(-manual)?[.].+')
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|webp|png)');
