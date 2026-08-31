@@ -101,6 +101,27 @@ function introText(ex: Exhibition, categoryName: string): string {
   return lines.join("\n");
 }
 
+// projectUrl is a free-text field a team enters at submission — the "must
+// start with http(s)://" check on that form is client-side only, nothing
+// server-side stops a crafted value (e.g. via a direct Firestore write)
+// containing CR/LF or a non-http(s) scheme. Writing that straight into a
+// .url file's InternetShortcut content would let it inject extra INI keys
+// (CRLF injection) or point the shortcut at file:// / a UNC path — the
+// latter is a known forced-authentication vector (just Explorer rendering
+// the shortcut's icon can trigger an outbound SMB auth attempt) — against
+// whichever admin later opens the exported zip. Re-validated here, at the
+// point this untrusted value is used, rather than trusting it was already
+// clean.
+function isSafeHttpUrl(value: string): boolean {
+  if (/[\r\n\0]/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function urlShortcutContent(url: string): string {
   // Windows Internet Shortcut format — double-clicking opens the default
   // browser straight to the project's homepage.
@@ -135,7 +156,7 @@ export async function buildContestZip(
 
     const folder = contestFolder.folder(`${i + 1}. ${sanitizeName(ex.title)}`)!;
     folder.file("작품 소개.txt", introText(ex, category.name));
-    if (ex.projectUrl) {
+    if (ex.projectUrl && isSafeHttpUrl(ex.projectUrl)) {
       folder.file("프로젝트 링크.url", urlShortcutContent(ex.projectUrl));
     }
     if (ex.pageImageUrls && ex.pageImageUrls.length > 0) {

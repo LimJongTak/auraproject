@@ -120,7 +120,7 @@ function JudgeExhibitionWorkspace() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-6">
       <Breadcrumb
         items={[
           { label: "홈", href: "/" },
@@ -162,7 +162,7 @@ function JudgeExhibitionWorkspace() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] lg:items-start">
         <div className="min-w-0 flex flex-col gap-6">
           <div className="rounded-2xl border border-border bg-white p-5">
             <div className="flex items-start justify-between gap-3">
@@ -179,7 +179,7 @@ function JudgeExhibitionWorkspace() {
                 <ExternalLink size={13} /> 새 탭에서 보기
               </Link>
             </div>
-            <p className="mt-2 text-foreground/80">{exhibition.oneLiner}</p>
+            <p className="mt-2 max-w-3xl text-foreground/80">{exhibition.oneLiner}</p>
             {exhibition.hashtags && exhibition.hashtags.length > 0 && (
               <div className="mt-3">
                 <HashtagBadges hashtags={exhibition.hashtags} interactive={false} />

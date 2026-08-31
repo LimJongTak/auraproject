@@ -49,9 +49,25 @@ function IssueBadge({ count, pushRight = false }: { count: number; pushRight?: b
   );
 }
 
+// The focused judging workspace (/judge/[categoryId]/[exhibitionId]) wants
+// the sidebar out of the way entirely so the presentation PDF has room to
+// breathe — everywhere else in the admin/judge section keeps the normal
+// shell. Derived from the path rather than a manual toggle so it applies no
+// matter how you land on that page (심사 시작하기, 심사하기, 이전/다음).
+function isJudgingWorkspacePath(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  return segments[0] === "judge" && segments.length === 3;
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const issueCounts = useAdminIssueCounts();
+  const collapsed = isJudgingWorkspacePath(pathname);
+
+  // No wrapper at all here — the judging workspace page already manages its
+  // own max-width/padding (it renders the same way for a plain judge with no
+  // shell), so adding another one here would just double up on both.
+  if (collapsed) return <>{children}</>;
 
   return (
     <div className="mx-auto flex max-w-7xl items-start gap-8 px-4 py-8 lg:py-10">
