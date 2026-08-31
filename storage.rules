@@ -9,10 +9,16 @@ service firebase.storage {
     // Team membership isn't stored on the user profile — it lives in
     // teamMemberships/{uid}_{categoryId}, one doc per contest a user has
     // joined (mirrors myMembershipTeamId() in firestore.rules).
+    //
+    // get().data on a teamMemberships doc that doesn't exist (e.g. an admin,
+    // who never joins a team, replacing another team's PDF/thumbnail) throws
+    // rather than just failing the equality check below — so this must
+    // exists()-guard it first, or "isTeamMemberOf(...) || isAdmin()" denies
+    // the admin branch too whenever the error isn't absorbed by the OR.
     function isTeamMemberOf(exhibitionId) {
       let ex = firestore.get(/databases/(default)/documents/exhibitions/$(exhibitionId)).data;
-      let membership = firestore.get(/databases/(default)/documents/teamMemberships/$(request.auth.uid + '_' + ex.categoryId)).data;
-      return isSignedIn() && membership.teamId == ex.teamId;
+      let membershipPath = /databases/(default)/documents/teamMemberships/$(request.auth.uid + '_' + ex.categoryId);
+      return isSignedIn() && firestore.exists(membershipPath) && firestore.get(membershipPath).data.teamId == ex.teamId;
     }
 
     match /exhibitions/{exhibitionId}/pages/{fileName} {
