@@ -11,6 +11,7 @@ import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/ex
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { getAssignment } from "@/lib/firestore/judgeAssignments";
 import { RubricScoreForm } from "@/components/judge/RubricScoreForm";
+import { ScoreSheetExcelPanel } from "@/components/judge/ScoreSheetExcelPanel";
 import { JudgeAssignmentPanel } from "@/components/admin/JudgeAssignmentPanel";
 import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
@@ -97,6 +98,16 @@ function JudgeCategoryDetail() {
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "평가", href: "/judge" }, { label: category.name }]} />
       <h1 className="mt-4 text-2xl font-extrabold">{category.name} 평가</h1>
       <p className="mt-1 text-sm text-muted">제출작 {exhibitions.length}개</p>
+
+      {rubric.length > 0 && exhibitions.length > 0 && (
+        <ScoreSheetExcelPanel
+          category={category}
+          exhibitions={exhibitions}
+          myEvalByExhibition={myEvalByExhibition}
+          judgeUid={profile.uid}
+          judgeName={profile.name}
+        />
+      )}
 
       {rubric.length === 0 ? (
         <p className="mt-6 text-sm text-muted">
