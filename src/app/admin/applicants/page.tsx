@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Archive, Download } from "lucide-react";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { listAllExhibitionsForAdmin } from "@/lib/firestore/exhibitions";
 import { listAllTeamsForAdmin } from "@/lib/firestore/teams";
 import { listAllUsers } from "@/lib/firestore/users";
 import type { Category, Exhibition, MemberType, Team, UserProfile } from "@/types/models";
 import { toCsv, downloadCsv } from "@/lib/utils/csv";
+import { buildContestZip, type ExportProgress } from "@/lib/admin/exportContestZip";
 import { CenteredSpinner } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +28,7 @@ export default function AdminApplicantsPage() {
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [users, setUsers] = useState<UserProfile[] | null>(null);
+  const [zipProgress, setZipProgress] = useState<Record<string, ExportProgress | "done" | "error">>({});
 
   useEffect(() => {
     const unsub = subscribeCategories(setCategories);
@@ -104,6 +106,27 @@ export default function AdminApplicantsPage() {
     downloadCsv(`${category.name}_신청자명단.csv`, csv);
   }
 
+  async function handleDownloadZip(category: Category) {
+    const categoryExhibitions = exhibitions!.filter((e) => e.categoryId === category.id);
+    setZipProgress((prev) => ({ ...prev, [category.id]: { current: 0, total: 0, title: "" } }));
+    try {
+      const blob = await buildContestZip(category, categoryExhibitions, (progress) =>
+        setZipProgress((prev) => ({ ...prev, [category.id]: progress }))
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${category.name}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setZipProgress((prev) => ({ ...prev, [category.id]: "done" }));
+    } catch {
+      setZipProgress((prev) => ({ ...prev, [category.id]: "error" }));
+    }
+  }
+
   return (
     <div>
       <AdminPageHeader
@@ -114,23 +137,44 @@ export default function AdminApplicantsPage() {
       <div className="flex flex-col gap-6">
         {categories.map((c) => {
           const applicants = applicantsFor(c.id);
+          const publishedCount = exhibitions.filter((e) => e.categoryId === c.id && e.status === "published").length;
+          const progress = zipProgress[c.id];
+          const zipping = progress != null && progress !== "done" && progress !== "error";
           return (
             <div key={c.id} className="rounded-2xl border border-border bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-bold">{c.name}</p>
-                  <p className="text-xs text-muted">신청자 {applicants.length}명</p>
+                  <p className="text-xs text-muted">신청자 {applicants.length}명 · 게시된 작품 {publishedCount}개</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(c, applicants)}
-                  disabled={applicants.length === 0}
-                  className="shrink-0"
-                >
-                  <Download size={14} /> CSV 다운로드
-                </Button>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(c, applicants)}
+                    disabled={applicants.length === 0}
+                  >
+                    <Download size={14} /> CSV 다운로드
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={zipping}
+                    onClick={() => handleDownloadZip(c)}
+                    disabled={publishedCount === 0 || zipping}
+                  >
+                    <Archive size={14} /> 작품 ZIP 다운로드
+                  </Button>
+                </div>
               </div>
+              {progress && progress !== "done" && progress !== "error" && (
+                <p className="mt-2 text-xs text-muted">
+                  {progress.total === 0
+                    ? "준비 중..."
+                    : `작품 압축 중 (${progress.current}/${progress.total}) — ${progress.title}`}
+                </p>
+              )}
+              {progress === "error" && <p className="mt-2 text-xs font-medium text-red-600">ZIP 생성에 실패했어요</p>}
 
               {applicants.length > 0 && (
                 <div className="mt-4 overflow-x-auto">
