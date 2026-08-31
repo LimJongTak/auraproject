@@ -1,38 +1,39 @@
 import ExcelJS from "exceljs";
 import type { Category, Evaluation, Exhibition, RubricItem } from "@/types/models";
 
-// Sentinel written into the first cell of the trailing comment row so upload
-// parsing can tell it apart from a rubric item row using the same [id]
-// convention (see extractId below) instead of matching on the visible label
-// text, which a judge might retype.
+// Sentinel written into the hidden id column for the trailing comment row,
+// so upload parsing can tell it apart from a rubric item row.
 const COMMENT_ROW_ID = "__comment__";
 
-// Every header cell (row 1 = which exhibition, column 1 = which rubric item)
-// carries its real id in a trailing "[...]" so re-upload can match rows/
-// columns back to the right doc even if a judge reorders, resizes, or
-// retranslates the visible label — only the bracketed id has to survive.
-const ID_SUFFIX_RE = /\[([^[\]]+)\]\s*$/;
+// The visible grid is one row and one column narrower than the sheet: row 1
+// and column A are hidden and hold the real exhibitionId/rubric-item id for
+// each column/row, so re-upload can match cells back to the right doc even
+// if a judge reorders or resizes the visible columns — without cluttering
+// the labels a judge actually reads with raw ids (see the screenshot this
+// replaced: ids used to be appended in brackets right in the cell text).
+const ID_ROW = 1;
+const ID_COL = 1;
+const HEADER_ROW = 2;
+const LABEL_COL = 2;
+const FIRST_DATA_ROW = 3;
+const FIRST_DATA_COL = 3;
 
-function extractId(text: string): string | null {
-  const m = ID_SUFFIX_RE.exec(text.trim());
-  return m ? m[1] : null;
-}
-
-function itemHeaderText(item: RubricItem): string {
+function itemLabelText(item: RubricItem): string {
   const group = item.group ? `${item.group} - ` : "";
-  return `${group}${item.label} (배점 ${item.maxScore}) [${item.id}]`;
+  return `${group}${item.label} (배점 ${item.maxScore})`;
 }
 
-function exhibitionHeaderText(ex: Pick<Exhibition, "id" | "teamName" | "title">): string {
-  return `${ex.teamName} - ${ex.title} [${ex.id}]`;
+function exhibitionHeaderText(ex: Pick<Exhibition, "teamName" | "title">): string {
+  return `${ex.teamName} - ${ex.title}`;
 }
 
-// Builds the downloadable score sheet: row 1 is one column per exhibition,
-// column 1 (frozen, along with the header row) is one row per rubric item
-// with its 심사 기준 attached as a cell note, and a trailing "코멘트" row for
-// free-text feedback. Cells are pre-filled with the given judge's existing
-// scores/comment so re-downloading mid-judging resumes instead of blanking
-// out already-entered work.
+// Builds the downloadable score sheet: one visible column per exhibition,
+// one visible row per rubric item with its 심사 기준 attached as a cell note,
+// and a trailing "코멘트" row for free-text feedback. The header row and
+// item-label column are both frozen so either stays in view while scrolling
+// the other. Cells are pre-filled with the given judge's existing scores/
+// comment so re-downloading mid-judging resumes instead of blanking out
+// already-entered work.
 export async function buildScoreSheetWorkbook(
   category: Category,
   exhibitions: Exhibition[],
@@ -43,24 +44,28 @@ export async function buildScoreSheetWorkbook(
   const sheetName = category.name.replace(/[[\]*?/\\:]/g, "").slice(0, 28) || "심사표";
   const sheet = workbook.addWorksheet(sheetName);
 
-  const headerRow = sheet.getRow(1);
-  headerRow.getCell(1).value = "평가항목";
+  const idRow = sheet.getRow(ID_ROW);
+  const headerRow = sheet.getRow(HEADER_ROW);
+  headerRow.getCell(LABEL_COL).value = "평가항목";
   exhibitions.forEach((ex, i) => {
-    headerRow.getCell(i + 2).value = exhibitionHeaderText(ex);
+    const col = FIRST_DATA_COL + i;
+    idRow.getCell(col).value = ex.id;
+    headerRow.getCell(col).value = exhibitionHeaderText(ex);
   });
   headerRow.font = { bold: true };
   headerRow.alignment = { wrapText: true, vertical: "middle" };
 
   rubric.forEach((item, r) => {
-    const row = sheet.getRow(r + 2);
-    const labelCell = row.getCell(1);
-    labelCell.value = itemHeaderText(item);
+    const row = sheet.getRow(FIRST_DATA_ROW + r);
+    row.getCell(ID_COL).value = item.id;
+    const labelCell = row.getCell(LABEL_COL);
+    labelCell.value = itemLabelText(item);
     labelCell.note = item.criteria || "설명이 등록되어 있지 않아요";
     labelCell.font = { bold: true };
     labelCell.alignment = { wrapText: true, vertical: "middle" };
 
     exhibitions.forEach((ex, c) => {
-      const cell = row.getCell(c + 2);
+      const cell = row.getCell(FIRST_DATA_COL + c);
       const score = myEvaluations.get(ex.id)?.scores?.[item.id];
       cell.value = typeof score === "number" ? score : null;
       cell.dataValidation = {
@@ -74,21 +79,20 @@ export async function buildScoreSheetWorkbook(
     });
   });
 
-  const commentRow = sheet.getRow(rubric.length + 2);
-  commentRow.getCell(1).value = `코멘트 [${COMMENT_ROW_ID}]`;
-  commentRow.getCell(1).font = { bold: true };
+  const commentRow = sheet.getRow(FIRST_DATA_ROW + rubric.length);
+  commentRow.getCell(ID_COL).value = COMMENT_ROW_ID;
+  commentRow.getCell(LABEL_COL).value = "코멘트";
+  commentRow.getCell(LABEL_COL).font = { bold: true };
   exhibitions.forEach((ex, c) => {
-    commentRow.getCell(c + 2).value = myEvaluations.get(ex.id)?.comment ?? "";
+    commentRow.getCell(FIRST_DATA_COL + c).value = myEvaluations.get(ex.id)?.comment ?? "";
   });
 
-  sheet.getColumn(1).width = 42;
-  for (let i = 0; i < exhibitions.length; i++) sheet.getColumn(i + 2).width = 22;
+  sheet.getColumn(ID_COL).hidden = true;
+  sheet.getColumn(LABEL_COL).width = 42;
+  for (let i = 0; i < exhibitions.length; i++) sheet.getColumn(FIRST_DATA_COL + i).width = 22;
+  idRow.hidden = true;
 
-  // Freezes both the header row and the item-label column so either axis
-  // stays in view while scrolling the other — the app asked for the column,
-  // freezing the header row alongside it is the natural companion for a
-  // matrix this shape.
-  sheet.views = [{ state: "frozen", xSplit: 1, ySplit: 1 }];
+  sheet.views = [{ state: "frozen", xSplit: LABEL_COL, ySplit: HEADER_ROW }];
 
   return (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
 }
@@ -111,10 +115,12 @@ export interface ParseScoreSheetResult {
 
 // Reads a workbook produced by (or shaped like) buildScoreSheetWorkbook back
 // into per-exhibition score/comment updates, matching rows and columns by
-// their bracketed ids rather than position — so a judge can freely reorder
-// or resize columns without corrupting the upload. Anything it can't match
-// against this contest's current rubric/exhibitions is skipped and reported
-// as a warning instead of failing the whole upload.
+// the hidden id row/column rather than position or visible text — so a
+// judge can freely relabel, reorder, or resize the visible columns without
+// corrupting the upload, as long as whole rows/columns move together (which
+// is how Excel moves them). Anything it can't match against this contest's
+// current rubric/exhibitions is skipped and reported as a warning instead of
+// failing the whole upload.
 export async function parseScoreSheetWorkbook(
   buffer: ArrayBuffer,
   category: Category,
@@ -131,14 +137,14 @@ export async function parseScoreSheetWorkbook(
   if (!sheet) return { rows: [], warnings: ["엑셀 파일에서 시트를 찾을 수 없어요"] };
 
   const colToExhibitionId = new Map<number, string>();
-  const headerRow = sheet.getRow(1);
-  const lastCol = Math.max(headerRow.cellCount, sheet.columnCount);
-  for (let c = 2; c <= lastCol; c++) {
-    const text = String(headerRow.getCell(c).value ?? "").trim();
-    if (!text) continue;
-    const id = extractId(text);
-    if (!id || !exhibitionIds.has(id)) {
-      warnings.push(`${c}번째 열의 작품을 이 대회에서 찾을 수 없어 건너뛰었어요: "${text}"`);
+  const idRow = sheet.getRow(ID_ROW);
+  const lastCol = Math.max(idRow.cellCount, sheet.getRow(HEADER_ROW).cellCount, sheet.columnCount);
+  for (let c = FIRST_DATA_COL; c <= lastCol; c++) {
+    const id = String(idRow.getCell(c).value ?? "").trim();
+    if (!id) continue;
+    if (!exhibitionIds.has(id)) {
+      const label = String(sheet.getRow(HEADER_ROW).getCell(c).value ?? "").trim();
+      warnings.push(`${c}번째 열의 작품을 이 대회에서 찾을 수 없어 건너뛰었어요: "${label || id}"`);
       continue;
     }
     colToExhibitionId.set(c, id);
@@ -148,14 +154,14 @@ export async function parseScoreSheetWorkbook(
   const commentsByExhibition = new Map<string, string>();
 
   sheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-    const labelText = String(row.getCell(1).value ?? "").trim();
-    if (!labelText) return;
-    const id = extractId(labelText);
+    if (rowNumber < FIRST_DATA_ROW) return;
+    const id = String(row.getCell(ID_COL).value ?? "").trim();
+    if (!id) return;
     const isCommentRow = id === COMMENT_ROW_ID;
-    const item = id && !isCommentRow ? rubricById.get(id) : undefined;
+    const item = isCommentRow ? undefined : rubricById.get(id);
     if (!isCommentRow && !item) {
-      warnings.push(`${rowNumber}번째 행의 평가항목을 이 대회 평가표에서 찾을 수 없어 건너뛰었어요: "${labelText}"`);
+      const label = String(row.getCell(LABEL_COL).value ?? "").trim();
+      warnings.push(`${rowNumber}번째 행의 평가항목을 이 대회 평가표에서 찾을 수 없어 건너뛰었어요: "${label || id}"`);
       return;
     }
 
