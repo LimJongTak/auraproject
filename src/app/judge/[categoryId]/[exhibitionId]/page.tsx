@@ -215,7 +215,7 @@ function JudgeExhibitionWorkspace() {
           )}
         </div>
 
-        <div className="flex flex-col gap-3 lg:sticky lg:top-6">
+        <div className="flex flex-col gap-3 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <div className="rounded-2xl border border-border bg-white p-5">
             <p className="font-bold">채점하기</p>
             {rubric.length === 0 ? (
