@@ -2,6 +2,7 @@ import {randomBytes} from "node:crypto";
 import {setGlobalOptions} from "firebase-functions";
 import {onCall, HttpsError} from "firebase-functions/https";
 import {onSchedule} from "firebase-functions/scheduler";
+import {defineSecret} from "firebase-functions/params";
 import {initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {getAuth} from "firebase-admin/auth";
@@ -10,6 +11,98 @@ import {getStorage} from "firebase-admin/storage";
 setGlobalOptions({maxInstances: 10});
 
 initializeApp();
+
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+const RESET_EMAIL_FROM = "AURA 대회 플랫폼 <noreply@axlab.scnuai.com>";
+
+/**
+ * Builds the HTML body for a password-reset email.
+ * @param {string} link The Firebase Auth password-reset link.
+ * @return {string} The email HTML.
+ */
+function buildResetEmailHtml(link: string): string {
+  const buttonStyle = "background:#6366f1;color:#fff;padding:12px 20px;" +
+    "border-radius:8px;text-decoration:none;font-weight:600;";
+  return `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;
+      line-height: 1.6;">
+      <h2>비밀번호 재설정</h2>
+      <p>아래 버튼을 눌러 새 비밀번호를 설정해주세요. 이 링크는 1시간 동안만 유효해요.</p>
+      <p style="margin: 24px 0;">
+        <a href="${link}" style="${buttonStyle}">비밀번호 재설정하기</a>
+      </p>
+      <p style="color:#666;font-size:13px;">
+        본인이 요청하지 않았다면 이 메일을 무시해주세요.<br/>
+        버튼이 동작하지 않으면 아래 링크를 브라우저에 붙여넣어주세요:<br/>
+        <a href="${link}">${link}</a>
+      </p>
+    </div>
+  `;
+}
+
+// Firebase Auth's own password-reset email delivery is opaque to us (no
+// custom sender domain, easy to land in spam), so we generate the reset
+// link with the Admin SDK ourselves and deliver it through Resend instead.
+// generatePasswordResetLink still validates `url` against the project's
+// authorized-domains list, same as the client SDK's sendPasswordResetEmail
+// did before.
+export const sendPasswordResetEmail = onCall(
+  {secrets: [RESEND_API_KEY]},
+  async (request) => {
+    const email = request.data?.email;
+    const continueUrl = request.data?.continueUrl;
+    if (!email || typeof email !== "string") {
+      throw new HttpsError("invalid-argument", "이메일을 확인할 수 없어요");
+    }
+    if (!continueUrl || typeof continueUrl !== "string") {
+      throw new HttpsError("invalid-argument", "요청을 처리할 수 없어요");
+    }
+
+    let link: string;
+    try {
+      link = await getAuth().generatePasswordResetLink(
+        email, {url: continueUrl}
+      );
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/user-not-found" || code === "auth/email-not-found") {
+        throw new HttpsError("not-found", "가입되지 않은 계정이에요");
+      }
+      if (
+        code === "auth/invalid-continue-uri" ||
+        code === "auth/unauthorized-continue-uri"
+      ) {
+        throw new HttpsError("invalid-argument", "요청을 처리할 수 없어요");
+      }
+      console.error("generatePasswordResetLink failed", err);
+      throw new HttpsError(
+        "internal", "재설정 링크 생성에 실패했어요. 다시 시도해주세요"
+      );
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY.value()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: RESET_EMAIL_FROM,
+        to: email,
+        subject: "[AURA] 비밀번호 재설정 안내",
+        html: buildResetEmailHtml(link),
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.error("Resend send failed", response.status, body);
+      throw new HttpsError("internal", "메일 발송에 실패했어요. 잠시 후 다시 시도해주세요");
+    }
+
+    return {ok: true};
+  }
+);
 
 interface TeamData {
   leaderUid: string;

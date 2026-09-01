@@ -4,9 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
-import { toKoreanAuthError } from "@/lib/firebase/errors";
+import { sendPasswordResetEmail } from "@/lib/functions/sendPasswordResetEmail";
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from "@/lib/validation/authSchemas";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
@@ -24,12 +22,13 @@ export default function ForgotPasswordPage() {
   async function onSubmit(values: ForgotPasswordFormValues) {
     setSubmitError(null);
     try {
-      await sendPasswordResetEmail(auth, values.email, {
-        url: `${window.location.origin}/reset-password`,
+      await sendPasswordResetEmail({
+        email: values.email,
+        continueUrl: `${window.location.origin}/reset-password`,
       });
       setSent(true);
     } catch (error) {
-      setSubmitError(toKoreanAuthError(error));
+      setSubmitError(error instanceof Error ? error.message : "요청 처리 중 문제가 발생했어요. 다시 시도해주세요.");
     }
   }
 

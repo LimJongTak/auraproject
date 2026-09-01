@@ -70,7 +70,23 @@ npx firebase emulators:start
 4. 배포 후 며칠간 App Check 콘솔의 **요청** 탭에서 "검증됨" 비율을 모니터링 — 정상 트래픽이 대부분 검증되는 것을 확인하기 전에는 강제 적용하지 않기
 5. 문제없이 확인되면 App Check → **API** 탭에서 Firestore/Storage/Cloud Functions 각각을 **적용(Enforce)**으로 전환 — 이 순간부터 App Check 토큰이 없는 요청은 실제로 거부됩니다
 
-## 8. 알아두면 좋은 점
+## 8. 비밀번호 재설정 메일 발송 (Resend)
+
+비밀번호 찾기 메일은 Firebase Auth가 아니라 [Resend](https://resend.com)로 발송됩니다. Cloud Functions에서 Admin SDK로 재설정 링크만 생성하고, 실제 메일 발송은 Resend API로 합니다.
+
+1. https://resend.com 가입 → **API Keys** → **Create API Key**로 키 발급
+2. **Domains** → **Add Domain**에서 `axlab.scnuai.com` 추가 → 안내되는 TXT/MX/CNAME 레코드를 도메인 DNS에 등록 → 인증 완료까지 대기 (다른 시스템이 이미 이 서브도메인으로 메일을 보내고 있다면, 기존 레코드를 지우지 말고 Resend가 안내하는 레코드를 추가로 등록하면 됩니다 — DKIM 선택자가 달라 충돌하지 않아요. 도메인 인증 전에는 실제 수신자에게 발송이 실패합니다. 본인 계정 이메일로 테스트만 하려면 발신 주소를 인증 없이 쓸 수 있는 `onboarding@resend.dev`로 임시 변경해도 됩니다)
+3. 발신 주소는 `functions/src/index.ts`의 `RESET_EMAIL_FROM` 상수에 있습니다 (현재값: `AURA 대회 플랫폼 <noreply@axlab.scnuai.com>`, 이 프로젝트가 이미 쓰고 있는 `AX OPEN LAB <noreply@axlab.scnuai.com>` / `A.U.R.A 마일리지 <aura@axlab.scnuai.com>`와 겹치지 않는 별도 발신 주소예요). 필요하면 수정하세요
+4. 발급받은 API 키를 Cloud Functions 시크릿으로 등록:
+   ```bash
+   npx firebase functions:secrets:set RESEND_API_KEY
+   ```
+   (프롬프트에 키 값 붙여넣기 — `.env.local`에는 넣지 않습니다. Secret Manager에 저장되고 배포 시 `sendPasswordResetEmail` 함수에만 주입됩니다)
+5. `npx firebase deploy --only functions`로 배포
+
+로컬 에뮬레이터(`firebase emulators:start`)에서 이 함수를 테스트하려면 `functions/.secret.local` 파일에 `RESEND_API_KEY=재발급받은키`를 추가하세요(gitignore 대상이어야 합니다).
+
+## 9. 알아두면 좋은 점
 
 - Cloud Functions(관리자 전용 탈퇴 처리, 심사위원 임시 계정 발급 등)를 사용하므로 Firebase **Blaze(종량제) 요금제**가 필요합니다. `functions/` 배포는 `npx firebase deploy --only functions`.
 - 좋아요/댓글 카운터는 클라이언트 트랜잭션 + 보안 규칙(±1 제한)으로 관리되며 완전한 원자성을 100% 보장하진 않습니다. 대회 운영 중 수치가 어긋나는 것이 의심되면 Firestore 콘솔에서 해당 문서를 직접 확인/수정하면 됩니다.
