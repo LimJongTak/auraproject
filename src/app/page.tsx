@@ -8,6 +8,7 @@ import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeMyMemberships } from "@/lib/firestore/teams";
 import type { Exhibition, TeamMembership } from "@/types/models";
 import { ContestBanners } from "@/components/home/ContestBanners";
+import { PopularExhibitions } from "@/components/home/PopularExhibitions";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
 import { ExhibitionMarquee } from "@/components/exhibitions/ExhibitionMarquee";
 import { Button } from "@/components/ui/Button";
@@ -19,10 +20,14 @@ const MARQUEE_THRESHOLD = 6;
 export default function HomePage() {
   const { firebaseUser, profile } = useAuth();
   const [recent, setRecent] = useState<Exhibition[] | null>(null);
+  const [popular, setPopular] = useState<Exhibition[]>([]);
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
 
   useEffect(() => {
     listPublishedExhibitions({ sort: "latest", max: 18 }).then(setRecent);
+    listPublishedExhibitions({ sort: "popular", max: 3 }).then((exhibitions) =>
+      setPopular(exhibitions.filter((e) => e.likeCount > 0))
+    );
   }, []);
 
   useEffect(() => {
@@ -34,6 +39,8 @@ export default function HomePage() {
   return (
     <div>
       <ContestBanners />
+
+      <PopularExhibitions exhibitions={popular} />
 
       <section className="mx-auto max-w-6xl px-4 py-14">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
