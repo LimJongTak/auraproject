@@ -13,7 +13,18 @@ import { ErrorText } from "@/components/ui/misc";
 
 const MAX_BULK_ISSUE = 30;
 
-export function JudgeAssignmentPanel({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
+export function JudgeAssignmentPanel({
+  categoryId,
+  categoryName,
+  onChange,
+}: {
+  categoryId: string;
+  categoryName: string;
+  // Notifies the parent whenever the assignment list is (re)loaded, so pages
+  // that show their own summary of who's assigned (e.g. the judging-status
+  // panel) can stay in sync without duplicating this panel's fetch-on-mount.
+  onChange?: (assignments: JudgeAssignment[]) => void;
+}) {
   const [assignments, setAssignments] = useState<JudgeAssignment[] | null>(null);
   const [users, setUsers] = useState<UserProfile[] | null>(null);
   const [search, setSearch] = useState("");
@@ -26,7 +37,9 @@ export function JudgeAssignmentPanel({ categoryId, categoryName }: { categoryId:
   const [error, setError] = useState<string | null>(null);
 
   async function refreshAssignments() {
-    setAssignments(await listAssignmentsForCategory(categoryId));
+    const next = await listAssignmentsForCategory(categoryId);
+    setAssignments(next);
+    onChange?.(next);
   }
 
   useEffect(() => {

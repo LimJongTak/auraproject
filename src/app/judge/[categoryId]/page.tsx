@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, PlayCircle } from "lucide-react";
+import { ArrowRight, Download, ExternalLink, PlayCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
 import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
-import { getAssignment } from "@/lib/firestore/judgeAssignments";
+import { getAssignment, listAssignmentsForCategory } from "@/lib/firestore/judgeAssignments";
 import { ScoreSheetExcelPanel } from "@/components/judge/ScoreSheetExcelPanel";
 import { JudgeAssignmentPanel } from "@/components/admin/JudgeAssignmentPanel";
+import { JudgingStatusPanel } from "@/components/admin/JudgingStatusPanel";
+import { buildJudgingResultsWorkbook } from "@/lib/admin/judgingResultsExcel";
 import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +39,10 @@ function JudgeCategoryDetail() {
   // confirmed the caller isn't assigned to this contest. Admins skip this
   // check entirely (see the gate below).
   const [myAssignment, setMyAssignment] = useState<JudgeAssignment | null | undefined>(undefined);
+  // Every judge assigned to this contest — admin-only, drives the judging-
+  // status panel, the results Excel export, and stays in sync with
+  // JudgeAssignmentPanel via its onChange callback below.
+  const [assignments, setAssignments] = useState<JudgeAssignment[]>([]);
 
   useEffect(() => {
     getCategory(params.categoryId).then(setCategory);
@@ -47,6 +53,11 @@ function JudgeCategoryDetail() {
     getAssignment(profile.uid, params.categoryId)
       .then(setMyAssignment)
       .catch(() => setMyAssignment(null));
+  }, [profile, params.categoryId]);
+
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    listAssignmentsForCategory(params.categoryId).then(setAssignments);
   }, [profile, params.categoryId]);
 
   useEffect(() => {
@@ -183,11 +194,21 @@ function JudgeCategoryDetail() {
         </ul>
       )}
 
-      {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
-        <AwardPanel exhibitions={exhibitions} evaluations={evaluations} />
+      {profile.role === "admin" && (
+        <JudgeAssignmentPanel categoryId={category.id} categoryName={category.name} onChange={setAssignments} />
       )}
 
-      {profile.role === "admin" && <JudgeAssignmentPanel categoryId={category.id} categoryName={category.name} />}
+      {profile.role === "admin" && (
+        <JudgingStatusPanel
+          assignments={assignments}
+          evaluations={evaluations ?? []}
+          totalExhibitions={exhibitions.length}
+        />
+      )}
+
+      {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
+        <AwardPanel category={category} exhibitions={exhibitions} evaluations={evaluations} assignments={assignments} />
+      )}
     </div>
   );
 }
@@ -198,9 +219,40 @@ interface AwardDraft {
   rank: string;
 }
 
-function AwardPanel({ exhibitions, evaluations }: { exhibitions: Exhibition[]; evaluations: Evaluation[] }) {
+function AwardPanel({
+  category,
+  exhibitions,
+  evaluations,
+  assignments,
+}: {
+  category: Category;
+  exhibitions: Exhibition[];
+  evaluations: Evaluation[];
+  assignments: JudgeAssignment[];
+}) {
   const [drafts, setDrafts] = useState<Record<string, AwardDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const buffer = await buildJudgingResultsWorkbook(category, exhibitions, evaluations, assignments);
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${category.name}_심사결과.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     setDrafts((prev) => {
@@ -248,8 +300,15 @@ function AwardPanel({ exhibitions, evaluations }: { exhibitions: Exhibition[]; e
 
   return (
     <div className="mt-10 rounded-2xl border border-border bg-white p-5">
-      <h2 className="font-bold">수상작 지정</h2>
-      <p className="mt-1 text-sm text-muted">심사위원 평균 점수 기준으로 정렬돼요. 관리자에게만 보여요.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-bold">수상작 지정 · 채점 집계</h2>
+          <p className="mt-1 text-sm text-muted">심사위원 평균 점수 기준으로 정렬돼요. 관리자에게만 보여요.</p>
+        </div>
+        <Button variant="outline" size="sm" loading={exporting} onClick={handleExport}>
+          <Download size={14} /> 심사 결과 엑셀
+        </Button>
+      </div>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
