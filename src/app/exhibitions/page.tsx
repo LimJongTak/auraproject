@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trophy } from "lucide-react";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeCategories } from "@/lib/firestore/categories";
@@ -40,10 +40,13 @@ export default function ExhibitionsPage() {
 }
 
 function ExhibitionsPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
-  const [sort, setSort] = useState<SortOption>("latest");
+  const [sort, setSort] = useState<SortOption>(
+    (searchParams.get("sort") as SortOption) || "latest"
+  );
   const [awardOnly, setAwardOnly] = useState(false);
   const [searchType, setSearchType] = useState<ExhibitionSearchType>(
     (searchParams.get("searchType") as ExhibitionSearchType) || "all"
@@ -71,6 +74,20 @@ function ExhibitionsPageInner() {
       .then(setExhibitions)
       .finally(() => setLoading(false));
   }, [categoryId, sort]);
+
+  // Persisted in the URL so the back button from a detail page restores the
+  // sort the user had selected, instead of resetting to the default.
+  function handleSortChange(next: SortOption) {
+    setSort(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "latest") {
+      params.delete("sort");
+    } else {
+      params.set("sort", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/exhibitions?${qs}` : "/exhibitions", { scroll: false });
+  }
 
   const hasAwards = useMemo(() => exhibitions.some((e) => e.award || e.popularAwardRank), [exhibitions]);
 
@@ -121,7 +138,7 @@ function ExhibitionsPageInner() {
           {(["latest", "popular"] as SortOption[]).map((opt) => (
             <button
               key={opt}
-              onClick={() => setSort(opt)}
+              onClick={() => handleSortChange(opt)}
               className={cn(
                 "rounded-full px-4 py-1.5 font-semibold transition",
                 sort === opt ? "bg-white text-primary shadow-sm" : "text-muted"
