@@ -149,8 +149,8 @@ export function ScoreSheetExcelPanel({
       <div>
         <p className="text-sm font-bold">엑셀로 심사하기</p>
         <p className="mt-0.5 text-xs text-muted">
-          심사표를 내려받아 엑셀에서 점수를 채운 뒤 그대로 업로드하면 점수가 반영돼요. 평가항목 이름에 마우스를 올리면
-          채점 기준이 메모로 표시돼요. 업로드가 꼬였다면 초기화 후 다시 시도해주세요.
+          심사표를 내려받아 엑셀에서 점수를 채운 뒤 그대로 업로드하면 점수가 반영돼요. 평가항목 이름 아래에 채점 기준이
+          함께 적혀 있어요. 업로드가 꼬였다면 초기화 후 다시 시도해주세요.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

@@ -20,7 +20,8 @@ const FIRST_DATA_COL = 3;
 
 function itemLabelText(item: RubricItem): string {
   const group = item.group ? `${item.group} - ` : "";
-  return `${group}${item.label} (배점 ${item.maxScore})`;
+  const criteria = item.criteria ? `\n${item.criteria}` : "";
+  return `${group}${item.label} (배점 ${item.maxScore})${criteria}`;
 }
 
 function exhibitionHeaderText(ex: Pick<Exhibition, "teamName" | "title">): string {
@@ -28,8 +29,8 @@ function exhibitionHeaderText(ex: Pick<Exhibition, "teamName" | "title">): strin
 }
 
 // Builds the downloadable score sheet: one visible column per exhibition,
-// one visible row per rubric item with its 심사 기준 attached as a cell note,
-// and a trailing "코멘트" row for free-text feedback. The header row and
+// one visible row per rubric item with its 심사 기준 printed inline under the
+// item name, and a trailing "코멘트" row for free-text feedback. The header row and
 // item-label column are both frozen so either stays in view while scrolling
 // the other. Cells are pre-filled with the given judge's existing scores/
 // comment so re-downloading mid-judging resumes instead of blanking out
@@ -59,10 +60,18 @@ export async function buildScoreSheetWorkbook(
     const row = sheet.getRow(FIRST_DATA_ROW + r);
     row.getCell(ID_COL).value = item.id;
     const labelCell = row.getCell(LABEL_COL);
+    // Criteria used to be attached as a cell note (hover tooltip), but
+    // ExcelJS has a long-standing bug reading a workbook's notes back after
+    // real Excel has touched them (throws "Cannot read properties of
+    // undefined (reading 'comments')" deep inside its xlsx parser — see
+    // https://github.com/exceljs/exceljs/issues/2797), which broke re-upload
+    // for anyone who so much as opened and saved the downloaded sheet in
+    // Excel. Printing the criteria directly in the cell avoids ever writing
+    // a notes/comments part into the file at all.
     labelCell.value = itemLabelText(item);
-    labelCell.note = item.criteria || "설명이 등록되어 있지 않아요";
     labelCell.font = { bold: true };
     labelCell.alignment = { wrapText: true, vertical: "middle" };
+    row.height = 60;
 
     exhibitions.forEach((ex, c) => {
       const cell = row.getCell(FIRST_DATA_COL + c);
