@@ -83,8 +83,17 @@ export async function buildScoreSheetWorkbook(
   commentRow.getCell(ID_COL).value = COMMENT_ROW_ID;
   commentRow.getCell(LABEL_COL).value = "코멘트";
   commentRow.getCell(LABEL_COL).font = { bold: true };
+  commentRow.getCell(LABEL_COL).alignment = { wrapText: true, vertical: "top" };
+  // No character limit on the comment itself — Excel cells hold far more
+  // than anyone would type here. But without wrapText + a tall row, a long
+  // comment just scrolls off past the cell's visible width and looks
+  // cut off/limited, even though the full text is still there. Wrapping
+  // and a generous row height make the whole comment visible while editing.
+  commentRow.height = 160;
   exhibitions.forEach((ex, c) => {
-    commentRow.getCell(FIRST_DATA_COL + c).value = myEvaluations.get(ex.id)?.comment ?? "";
+    const cell = commentRow.getCell(FIRST_DATA_COL + c);
+    cell.value = myEvaluations.get(ex.id)?.comment ?? "";
+    cell.alignment = { wrapText: true, vertical: "top" };
   });
 
   sheet.getColumn(ID_COL).hidden = true;

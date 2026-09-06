@@ -6,7 +6,7 @@ const evaluationsRef = () => collection(db, "evaluations");
 const evaluationHistoryRef = () => collection(db, "evaluationHistory");
 const evalId = (judgeUid: string, exhibitionId: string) => `${judgeUid}_${exhibitionId}`;
 
-function logEvaluationHistory(entry: {
+async function logEvaluationHistory(entry: {
   exhibitionId: string;
   categoryId: string;
   judgeUid: string;
@@ -16,11 +16,17 @@ function logEvaluationHistory(entry: {
   scores: Record<string, number>;
   totalScore: number;
   comment: string | null;
-}): Promise<unknown> {
-  // Fire-and-forget from the caller's perspective — a history-write hiccup
-  // shouldn't roll back or block the score itself from saving, so callers
-  // await this alongside (not before) the real write and don't fail on it.
-  return addDoc(evaluationHistoryRef(), { ...entry, createdAt: serverTimestamp() });
+}): Promise<void> {
+  // A history-write hiccup must never fail the caller — the real score/
+  // comment write above already succeeded by the time this runs, and a
+  // judge seeing "저장 실패" for a save that actually went through (because
+  // only the audit-log write failed) is worse than a silently missing
+  // history row. Swallow and log instead of propagating.
+  try {
+    await addDoc(evaluationHistoryRef(), { ...entry, createdAt: serverTimestamp() });
+  } catch (err) {
+    console.error("logEvaluationHistory failed", err);
+  }
 }
 
 export interface UpsertEvaluationInput {
