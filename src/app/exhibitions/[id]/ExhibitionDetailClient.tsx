@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Heart, Pencil, Trash2, Trophy } from "lucide-react";
+import { Heart, MessageSquare, Pencil, Trash2, Trophy } from "lucide-react";
 import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
 import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
@@ -156,6 +156,22 @@ export function ExhibitionDetailClient() {
       <div className="mt-4">
         <ReferenceLinksRow links={exhibition.referenceLinks} />
       </div>
+
+      {exhibition.judgeCommentsPublished && exhibition.publishedJudgeComments && exhibition.publishedJudgeComments.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-4">
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            <MessageSquare size={15} className="text-primary" /> 심사위원 코멘트
+          </div>
+          <ul className="mt-3 flex flex-col gap-3">
+            {exhibition.publishedJudgeComments.map((c, i) => (
+              <li key={i} className="rounded-xl bg-white p-3">
+                <p className="text-xs font-semibold text-muted">{c.label}</p>
+                <p className="mt-1 text-sm text-foreground/90">{c.comment}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 flex items-center gap-3">
         <LikeButton exhibitionId={exhibition.id} likeCount={exhibition.likeCount} />

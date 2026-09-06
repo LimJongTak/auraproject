@@ -54,6 +54,8 @@ export async function createDraftExhibition(input: NewExhibitionInput): Promise<
     submittedByUid: input.submittedByUid,
     award: null,
     popularAwardRank: null,
+    judgeCommentsPublished: false,
+    publishedJudgeComments: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -113,6 +115,23 @@ export async function setExhibitionAward(
   award: { label: string; rank: number } | null
 ): Promise<void> {
   await updateDoc(doc(db, "exhibitions", id), { award });
+}
+
+// Publishes (or hides) judge comments for one exhibition — scores never
+// leave the evaluations collection, only free-text comments, and only ever
+// as an admin-taken snapshot (see Exhibition.publishedJudgeComments). Passing
+// published: false just hides the existing snapshot rather than clearing it,
+// so re-publishing later doesn't require recomputing anything that hasn't
+// changed.
+export async function setExhibitionJudgeComments(
+  id: string,
+  published: boolean,
+  comments: { label: string; comment: string }[] | null
+): Promise<void> {
+  await updateDoc(doc(db, "exhibitions", id), {
+    judgeCommentsPublished: published,
+    publishedJudgeComments: comments,
+  });
 }
 
 export async function deleteExhibition(id: string): Promise<void> {

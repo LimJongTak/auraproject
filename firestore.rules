@@ -252,6 +252,8 @@ service cloud.firestore {
                   || request.resource.data.commentCount == resource.data.commentCount - 1))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['award']))
+          || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['judgeCommentsPublished', 'publishedJudgeComments']))
           // Admins can edit general fields (title, oneLiner, hashtags, referenceLinks,
           // etc.) on any exhibition, any time — unlike the team-member branch above,
           // this doesn't require team membership or an open submission window. It
@@ -311,6 +313,20 @@ service cloud.firestore {
         && request.resource.data.exhibitionId == resource.data.exhibitionId
         && request.resource.data.categoryId == resource.data.categoryId;
       allow delete: if isAdmin();
+    }
+
+    // ---------------- evaluation history (append-only audit log) ----------------
+    // One row per evaluations write (create/update/reset) — see
+    // upsertEvaluation/resetEvaluation in lib/firestore/evaluations.ts. Same
+    // access shape as evaluations above: judges only see/write rows for
+    // contests they're assigned to, admins see everything. Never updated or
+    // deleted so the log can't be tampered with after the fact.
+    match /evaluationHistory/{historyId} {
+      allow get: if canJudge(resource.data.categoryId);
+      allow list: if canJudge(resource.data.categoryId);
+      allow create: if canJudge(request.resource.data.categoryId)
+        && request.resource.data.judgeUid == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

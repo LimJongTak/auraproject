@@ -144,6 +144,14 @@ export interface Exhibition {
   // if not a winner. Separate from `award` so a judged prize and the
   // popularity award can coexist on the same exhibition.
   popularAwardRank: number | null;
+  // Admin-controlled, per exhibition — never scores, only free-text judge
+  // feedback, and only meant to be turned on once every assigned judge has
+  // scored this exhibition (enforced in the admin UI, not in rules). See
+  // setExhibitionJudgeComments. publishedJudgeComments is a snapshot taken at
+  // the moment an admin publishes, with judges anonymized as "심사위원 N" —
+  // re-publishing overwrites it with the latest comments.
+  judgeCommentsPublished: boolean;
+  publishedJudgeComments: { label: string; comment: string }[] | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -186,6 +194,28 @@ export interface Evaluation {
   comment: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// Append-only ledger written alongside every evaluations write (see
+// upsertEvaluation/resetEvaluation in lib/firestore/evaluations.ts) so an
+// admin can see what changed, when, and how it got there — a judge editing
+// scores by hand, re-uploading a score sheet, or resetting their own
+// evaluation all leave a row here. Never updated or deleted once created.
+export type EvaluationHistorySource = "form" | "excel" | "reset";
+export type EvaluationHistoryAction = "create" | "update" | "reset";
+
+export interface EvaluationHistoryEntry {
+  id: string;
+  exhibitionId: string;
+  categoryId: string;
+  judgeUid: string;
+  judgeName: string;
+  action: EvaluationHistoryAction;
+  source: EvaluationHistorySource;
+  scores: Record<string, number>;
+  totalScore: number;
+  comment: string | null;
+  createdAt: Timestamp;
 }
 
 // Doc ID: `${judgeUid}_${categoryId}` — its existence is what scopes a

@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Download, ExternalLink, PlayCircle } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Download, ExternalLink, MessageSquare, PlayCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory } from "@/lib/firestore/categories";
-import { listPublishedExhibitions, setExhibitionAward } from "@/lib/firestore/exhibitions";
+import { listPublishedExhibitions, setExhibitionAward, setExhibitionJudgeComments } from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { getAssignment, listAssignmentsForCategory } from "@/lib/firestore/judgeAssignments";
 import { ScoreSheetExcelPanel } from "@/components/judge/ScoreSheetExcelPanel";
 import { JudgeAssignmentPanel } from "@/components/admin/JudgeAssignmentPanel";
 import { JudgingStatusPanel } from "@/components/admin/JudgingStatusPanel";
+import { EvaluationHistoryPanel } from "@/components/admin/EvaluationHistoryPanel";
 import { buildJudgingResultsWorkbook } from "@/lib/admin/judgingResultsExcel";
 import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
@@ -43,6 +44,10 @@ function JudgeCategoryDetail() {
   // status panel, the results Excel export, and stays in sync with
   // JudgeAssignmentPanel via its onChange callback below.
   const [assignments, setAssignments] = useState<JudgeAssignment[]>([]);
+  // Collapsed by default — contests can have hundreds of submissions, and
+  // most visits here are either "check my progress" or "jump into scoring"
+  // (both served by the button above), not "scroll the whole roster".
+  const [showExhibitionList, setShowExhibitionList] = useState(false);
 
   useEffect(() => {
     getCategory(params.categoryId).then(setCategory);
@@ -150,48 +155,56 @@ function JudgeCategoryDetail() {
           <EmptyState title="제출된 작품이 없어요" />
         </div>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
-          {exhibitions.map((ex) => {
-            const myEval = myEvalByExhibition.get(ex.id) ?? null;
-            return (
-              <li
-                key={ex.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"
-              >
-                <Link href={`/judge/${category.id}/${ex.id}`} className="min-w-0 flex-1">
-                  <p className="truncate font-bold">{ex.title}</p>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <p className="text-sm text-muted">{ex.teamName}</p>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                        myEval ? "bg-primary-light text-primary-dark" : "bg-surface text-muted"
-                      )}
-                    >
-                      {myEval ? `채점완료 · ${myEval.totalScore}점` : "미채점"}
-                    </span>
-                  </div>
-                </Link>
-                <div className="flex shrink-0 items-center gap-3">
-                  <Link
-                    href={`/exhibitions/${ex.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+        <div className="mt-6">
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowExhibitionList((v) => !v)}>
+            {showExhibitionList ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            작품 목록 {showExhibitionList ? "접기" : `보기 (${exhibitions.length})`}
+          </Button>
+          {showExhibitionList && (
+            <ul className="mt-3 flex flex-col gap-3">
+              {exhibitions.map((ex) => {
+                const myEval = myEvalByExhibition.get(ex.id) ?? null;
+                return (
+                  <li
+                    key={ex.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"
                   >
-                    <ExternalLink size={13} /> 작품 보기
-                  </Link>
-                  <Link
-                    href={`/judge/${category.id}/${ex.id}`}
-                    className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-dark"
-                  >
-                    심사하기 <ArrowRight size={13} />
-                  </Link>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    <Link href={`/judge/${category.id}/${ex.id}`} className="min-w-0 flex-1">
+                      <p className="truncate font-bold">{ex.title}</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <p className="text-sm text-muted">{ex.teamName}</p>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                            myEval ? "bg-primary-light text-primary-dark" : "bg-surface text-muted"
+                          )}
+                        >
+                          {myEval ? `채점완료 · ${myEval.totalScore}점` : "미채점"}
+                        </span>
+                      </div>
+                    </Link>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Link
+                        href={`/exhibitions/${ex.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                      >
+                        <ExternalLink size={13} /> 작품 보기
+                      </Link>
+                      <Link
+                        href={`/judge/${category.id}/${ex.id}`}
+                        className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-dark"
+                      >
+                        심사하기 <ArrowRight size={13} />
+                      </Link>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {profile.role === "admin" && (
@@ -202,9 +215,12 @@ function JudgeCategoryDetail() {
         <JudgingStatusPanel
           assignments={assignments}
           evaluations={evaluations ?? []}
+          exhibitions={exhibitions}
           totalExhibitions={exhibitions.length}
         />
       )}
+
+      {profile.role === "admin" && <EvaluationHistoryPanel categoryId={category.id} exhibitions={exhibitions} />}
 
       {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
         <AwardPanel category={category} exhibitions={exhibitions} evaluations={evaluations} assignments={assignments} />
@@ -233,6 +249,7 @@ function AwardPanel({
   const [drafts, setDrafts] = useState<Record<string, AwardDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   async function handleExport() {
     setExporting(true);
@@ -298,6 +315,27 @@ function AwardPanel({
     }
   }
 
+  // Toggling on takes a fresh snapshot of every judge's comment for this
+  // exhibition (score never included — see Exhibition.publishedJudgeComments)
+  // and anonymizes the judge as "심사위원 N" rather than showing their name.
+  // Toggling off just hides that snapshot instead of clearing it.
+  async function handleToggleComments(exhibition: Exhibition, evs: Evaluation[]) {
+    setPublishingId(exhibition.id);
+    try {
+      const nextPublished = !exhibition.judgeCommentsPublished;
+      if (nextPublished) {
+        const comments = evs
+          .filter((e) => e.comment && e.comment.trim())
+          .map((e, i) => ({ label: `심사위원 ${i + 1}`, comment: e.comment!.trim() }));
+        await setExhibitionJudgeComments(exhibition.id, true, comments);
+      } else {
+        await setExhibitionJudgeComments(exhibition.id, false, exhibition.publishedJudgeComments ?? null);
+      }
+    } finally {
+      setPublishingId(null);
+    }
+  }
+
   return (
     <div className="mt-10 rounded-2xl border border-border bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -318,12 +356,16 @@ function AwardPanel({
               <th className="py-2 pr-4 font-semibold">작품</th>
               <th className="py-2 pr-4 font-semibold">평균점수</th>
               <th className="py-2 pr-4 font-semibold">수상 지정</th>
+              <th className="py-2 pr-4 font-semibold">심사평 공개</th>
               <th className="py-2 pr-4 font-semibold" />
             </tr>
           </thead>
           <tbody>
             {ranked.map((row, i) => {
               const draft = drafts[row.exhibition.id] ?? { preset: "", custom: "", rank: "" };
+              const evs = byExhibition.get(row.exhibition.id) ?? [];
+              const allJudgesDone = assignments.length > 0 && row.judgeCount >= assignments.length;
+              const hasComments = evs.some((e) => e.comment && e.comment.trim());
               return (
                 <tr key={row.exhibition.id} className="border-b border-border last:border-0 align-top">
                   <td className="py-3 pr-4">{i + 1}</td>
@@ -371,6 +413,22 @@ function AwardPanel({
                         }
                         className="w-20 rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
                       />
+                    </div>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-col items-start gap-1">
+                      <Button
+                        size="sm"
+                        variant={row.exhibition.judgeCommentsPublished ? "primary" : "outline"}
+                        loading={publishingId === row.exhibition.id}
+                        disabled={!row.exhibition.judgeCommentsPublished && (!allJudgesDone || !hasComments)}
+                        onClick={() => handleToggleComments(row.exhibition, evs)}
+                      >
+                        <MessageSquare size={14} />
+                        {row.exhibition.judgeCommentsPublished ? "공개 중" : "비공개"}
+                      </Button>
+                      {!allJudgesDone && <span className="text-xs text-muted">심사 미완료</span>}
+                      {allJudgesDone && !hasComments && <span className="text-xs text-muted">코멘트 없음</span>}
                     </div>
                   </td>
                   <td className="py-3 pr-4">
