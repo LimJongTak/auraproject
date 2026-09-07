@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronUp, Download, ExternalLink, MessageSquare, PlayCircle } from "lucide-react";
@@ -223,7 +223,15 @@ function JudgeCategoryDetail() {
       {profile.role === "admin" && <EvaluationHistoryPanel categoryId={category.id} exhibitions={exhibitions} />}
 
       {profile.role === "admin" && evaluations && rubric.length > 0 && exhibitions.length > 0 && (
-        <AwardPanel category={category} exhibitions={exhibitions} evaluations={evaluations} assignments={assignments} />
+        <AwardPanel
+          category={category}
+          exhibitions={exhibitions}
+          evaluations={evaluations}
+          assignments={assignments}
+          onExhibitionChange={(id, patch) =>
+            setExhibitions((prev) => prev && prev.map((ex) => (ex.id === id ? { ...ex, ...patch } : ex)))
+          }
+        />
       )}
     </div>
   );
@@ -235,21 +243,34 @@ interface AwardDraft {
   rank: string;
 }
 
+// The public-facing snapshot for one exhibition: comment text only, judges
+// anonymized as "심사위원 N" in the order they scored. Shared by the publish
+// action and the "공개본이 최신이 아님" check, so the warning is comparing
+// against exactly what re-publishing would write.
+function buildPublishableComments(evs: Evaluation[]) {
+  return evs
+    .filter((e) => e.comment && e.comment.trim())
+    .map((e, i) => ({ label: `심사위원 ${i + 1}`, comment: e.comment!.trim() }));
+}
+
 function AwardPanel({
   category,
   exhibitions,
   evaluations,
   assignments,
+  onExhibitionChange,
 }: {
   category: Category;
   exhibitions: Exhibition[];
   evaluations: Evaluation[];
   assignments: JudgeAssignment[];
+  onExhibitionChange: (id: string, patch: Partial<Exhibition>) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, AwardDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [openCommentsId, setOpenCommentsId] = useState<string | null>(null);
 
   async function handleExport() {
     setExporting(true);
@@ -323,14 +344,15 @@ function AwardPanel({
     setPublishingId(exhibition.id);
     try {
       const nextPublished = !exhibition.judgeCommentsPublished;
-      if (nextPublished) {
-        const comments = evs
-          .filter((e) => e.comment && e.comment.trim())
-          .map((e, i) => ({ label: `심사위원 ${i + 1}`, comment: e.comment!.trim() }));
-        await setExhibitionJudgeComments(exhibition.id, true, comments);
-      } else {
-        await setExhibitionJudgeComments(exhibition.id, false, exhibition.publishedJudgeComments ?? null);
-      }
+      const comments = nextPublished ? buildPublishableComments(evs) : exhibition.publishedJudgeComments ?? null;
+      await setExhibitionJudgeComments(exhibition.id, nextPublished, comments);
+      // The exhibition list is a one-shot read (listPublishedExhibitions), not
+      // a live subscription, so push the write back into it — otherwise the
+      // button keeps rendering the pre-toggle state until a page reload.
+      onExhibitionChange(exhibition.id, {
+        judgeCommentsPublished: nextPublished,
+        publishedJudgeComments: comments,
+      });
     } finally {
       setPublishingId(null);
     }
@@ -365,83 +387,138 @@ function AwardPanel({
               const draft = drafts[row.exhibition.id] ?? { preset: "", custom: "", rank: "" };
               const evs = byExhibition.get(row.exhibition.id) ?? [];
               const allJudgesDone = assignments.length > 0 && row.judgeCount >= assignments.length;
-              const hasComments = evs.some((e) => e.comment && e.comment.trim());
+              const commentedEvs = evs.filter((e) => e.comment && e.comment.trim());
+              const hasComments = commentedEvs.length > 0;
+              const commentsOpen = openCommentsId === row.exhibition.id;
+              // Published, but a judge has since edited/added a comment — the
+              // snapshot on the public page is stale until it's re-published.
+              const snapshotStale =
+                row.exhibition.judgeCommentsPublished &&
+                JSON.stringify(buildPublishableComments(evs)) !==
+                  JSON.stringify(row.exhibition.publishedJudgeComments ?? []);
               return (
-                <tr key={row.exhibition.id} className="border-b border-border last:border-0 align-top">
-                  <td className="py-3 pr-4">{i + 1}</td>
-                  <td className="py-3 pr-4">
-                    <p className="font-medium">{row.exhibition.title}</p>
-                    <p className="text-xs text-muted">{row.exhibition.teamName}</p>
-                  </td>
-                  <td className="py-3 pr-4">
-                    {row.avgScore.toFixed(1)}점 ({row.judgeCount}명)
-                  </td>
-                  <td className="py-3 pr-4">
-                    <div className="flex flex-col gap-1.5">
-                      <select
-                        value={draft.preset}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, preset: e.target.value } }))
-                        }
-                        className="rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
+                <Fragment key={row.exhibition.id}>
+                  <tr className="border-b border-border last:border-0 align-top">
+                    <td className="py-3 pr-4">{i + 1}</td>
+                    <td className="py-3 pr-4">
+                      <p className="font-medium">{row.exhibition.title}</p>
+                      <p className="text-xs text-muted">{row.exhibition.teamName}</p>
+                      <button
+                        type="button"
+                        onClick={() => setOpenCommentsId(commentsOpen ? null : row.exhibition.id)}
+                        className="mt-1 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                       >
-                        <option value="">선택 안 함</option>
-                        {AWARD_PRESETS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                        <option value="직접입력">직접입력</option>
-                      </select>
-                      {draft.preset === "직접입력" && (
-                        <input
-                          type="text"
-                          placeholder="수상명 직접입력"
-                          value={draft.custom}
+                        <MessageSquare size={12} />
+                        심사평 {commentedEvs.length}개 {commentsOpen ? "접기" : "보기"}
+                      </button>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {row.avgScore.toFixed(1)}점 ({row.judgeCount}명)
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-col gap-1.5">
+                        <select
+                          value={draft.preset}
                           onChange={(e) =>
-                            setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, custom: e.target.value } }))
+                            setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, preset: e.target.value } }))
                           }
                           className="rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
+                        >
+                          <option value="">선택 안 함</option>
+                          {AWARD_PRESETS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                          <option value="직접입력">직접입력</option>
+                        </select>
+                        {draft.preset === "직접입력" && (
+                          <input
+                            type="text"
+                            placeholder="수상명 직접입력"
+                            value={draft.custom}
+                            onChange={(e) =>
+                              setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, custom: e.target.value } }))
+                            }
+                            className="rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
+                          />
+                        )}
+                        <input
+                          type="number"
+                          placeholder="순위"
+                          value={draft.rank}
+                          onChange={(e) =>
+                            setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, rank: e.target.value } }))
+                          }
+                          className="w-20 rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
                         />
-                      )}
-                      <input
-                        type="number"
-                        placeholder="순위"
-                        value={draft.rank}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({ ...prev, [row.exhibition.id]: { ...draft, rank: e.target.value } }))
-                        }
-                        className="w-20 rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary"
-                      />
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <div className="flex flex-col items-start gap-1">
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-col items-start gap-1">
+                        <Button
+                          size="sm"
+                          variant={row.exhibition.judgeCommentsPublished ? "primary" : "outline"}
+                          loading={publishingId === row.exhibition.id}
+                          disabled={!row.exhibition.judgeCommentsPublished && (!allJudgesDone || !hasComments)}
+                          onClick={() => handleToggleComments(row.exhibition, evs)}
+                        >
+                          <MessageSquare size={14} />
+                          {row.exhibition.judgeCommentsPublished ? "공개 중" : "비공개"}
+                        </Button>
+                        {!allJudgesDone && <span className="text-xs text-muted">심사 미완료</span>}
+                        {allJudgesDone && !hasComments && <span className="text-xs text-muted">코멘트 없음</span>}
+                        {snapshotStale && (
+                          <span className="text-xs text-red-600">공개본이 예전 내용이에요 · 다시 눌러 갱신</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
                       <Button
                         size="sm"
-                        variant={row.exhibition.judgeCommentsPublished ? "primary" : "outline"}
-                        loading={publishingId === row.exhibition.id}
-                        disabled={!row.exhibition.judgeCommentsPublished && (!allJudgesDone || !hasComments)}
-                        onClick={() => handleToggleComments(row.exhibition, evs)}
+                        variant="outline"
+                        loading={savingId === row.exhibition.id}
+                        onClick={() => handleSave(row.exhibition.id)}
                       >
-                        <MessageSquare size={14} />
-                        {row.exhibition.judgeCommentsPublished ? "공개 중" : "비공개"}
+                        저장
                       </Button>
-                      {!allJudgesDone && <span className="text-xs text-muted">심사 미완료</span>}
-                      {allJudgesDone && !hasComments && <span className="text-xs text-muted">코멘트 없음</span>}
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={savingId === row.exhibition.id}
-                      onClick={() => handleSave(row.exhibition.id)}
-                    >
-                      저장
-                    </Button>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  {commentsOpen && (
+                    <tr className="border-b border-border last:border-0 bg-surface">
+                      <td colSpan={6} className="px-4 py-3">
+                        {evs.length === 0 ? (
+                          <p className="text-sm text-muted">아직 이 작품을 채점한 심사위원이 없어요.</p>
+                        ) : (
+                          <ul className="flex flex-col gap-2">
+                            {evs.map((ev) => (
+                              <li key={ev.id} className="rounded-xl border border-border bg-white px-3 py-2.5">
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span className="font-semibold">{ev.judgeName}</span>
+                                  <span className="rounded-full bg-primary-light px-2 py-0.5 font-semibold text-primary-dark">
+                                    {ev.totalScore}점
+                                  </span>
+                                  <span className="ml-auto text-muted">
+                                    {ev.updatedAt ? ev.updatedAt.toDate().toLocaleString("ko-KR") : "-"}
+                                  </span>
+                                </div>
+                                {ev.comment && ev.comment.trim() ? (
+                                  <p className="mt-1.5 whitespace-pre-wrap text-sm">{ev.comment.trim()}</p>
+                                ) : (
+                                  <p className="mt-1.5 text-sm text-muted">작성한 심사평이 없어요.</p>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <p className="mt-2 text-xs text-muted">
+                          심사위원 이름과 점수는 관리자에게만 보여요. 공개 시에는 이름·점수 없이 심사평만
+                          &quot;심사위원 N&quot;으로 익명 처리돼요.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
