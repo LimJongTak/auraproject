@@ -81,7 +81,7 @@ export function ContestBanner({ category }: { category: Category }) {
 
   return (
     <section
-      className="relative flex items-center overflow-hidden rounded-3xl bg-gradient-to-br from-foreground via-foreground to-primary-dark bg-cover bg-center py-14 text-white sm:aspect-[8/3] sm:py-0"
+      className="relative flex items-center overflow-hidden rounded-3xl bg-gradient-to-br from-foreground via-foreground to-primary-dark bg-contain bg-center bg-no-repeat py-14 text-white sm:aspect-[8/3] sm:bg-cover sm:py-0"
       style={category.bannerImageUrl ? { backgroundImage: `url(${category.bannerImageUrl})` } : undefined}
     >
       <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-8 px-4 text-center drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] sm:flex-row sm:items-center sm:justify-around sm:gap-4">

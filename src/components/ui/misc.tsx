@@ -48,19 +48,27 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
 
 export function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
   return (
-    <nav className="flex items-center gap-1.5 text-sm text-muted">
-      {items.map((item, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <span className="text-border">/</span>}
-          {item.href ? (
-            <a href={item.href} className="hover:text-primary">
-              {item.label}
-            </a>
-          ) : (
-            <span className={i === items.length - 1 ? "font-medium text-foreground" : ""}>{item.label}</span>
-          )}
-        </span>
-      ))}
+    <nav className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+      {items.map((item, i) => {
+        const isLast = i === items.length - 1;
+        return (
+          <span key={i} className={cn("flex min-w-0 items-center gap-1.5", isLast && "flex-1")}>
+            {i > 0 && <span className="shrink-0 text-border">/</span>}
+            {item.href ? (
+              <a href={item.href} className="shrink-0 hover:text-primary">
+                {item.label}
+              </a>
+            ) : (
+              // Only the current-page crumb (isLast) can be long (e.g. an
+              // exhibition title) — truncate just that one so it never wraps
+              // mid-word (CJK text wraps between any two characters by
+              // default, unlike Latin script) while earlier, short crumbs
+              // stay on one line.
+              <span className={cn(isLast ? "truncate font-medium text-foreground" : "shrink-0")}>{item.label}</span>
+            )}
+          </span>
+        );
+      })}
     </nav>
   );
 }
