@@ -11,6 +11,7 @@ import { redactUnannouncedAwards } from "@/lib/utils/awardReveal";
 import type { Category, Exhibition, TeamMembership } from "@/types/models";
 import { ContestBanners } from "@/components/home/ContestBanners";
 import { PopularExhibitions } from "@/components/home/PopularExhibitions";
+import { CategoryAwardResults } from "@/components/contest/AwardResults";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
 import { ExhibitionMarquee } from "@/components/exhibitions/ExhibitionMarquee";
 import { Button } from "@/components/ui/Button";
@@ -50,11 +51,28 @@ export default function HomePage() {
     [recent, categoriesById]
   );
 
+  // Contests that might have something to show in the 수상 결과 section —
+  // either a reveal countdown was ever set, or the popular-award scheduler
+  // has run for them. Cheap boolean checks on data already in `categories`,
+  // so ordinary awardless contests never trigger the section's own fetch.
+  const awardCandidates = categories.filter((c) => !!c.awardAnnounceAt || !!c.popularAwardAssignedAt);
+
   return (
     <div>
       <ContestBanners />
 
       <PopularExhibitions exhibitions={popular} />
+
+      {awardCandidates.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pt-14">
+          <h2 className="text-xl font-extrabold">수상 결과</h2>
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {awardCandidates.map((c) => (
+              <CategoryAwardResults key={c.id} category={c} showHeading />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 py-14">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
