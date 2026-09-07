@@ -270,6 +270,7 @@ function AwardPanel({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
   const [openCommentsId, setOpenCommentsId] = useState<string | null>(null);
 
   async function handleExport() {
@@ -358,6 +359,46 @@ function AwardPanel({
     }
   }
 
+  // Same eligibility as the per-row button: every assigned judge has scored,
+  // and at least one of them left a comment. Re-publishing a row that's
+  // already public just refreshes its snapshot to the latest comments.
+  const publishableRows = ranked.filter((row) => {
+    const evs = byExhibition.get(row.exhibition.id) ?? [];
+    const allJudgesDone = assignments.length > 0 && row.judgeCount >= assignments.length;
+    return allJudgesDone && evs.some((e) => e.comment && e.comment.trim());
+  });
+  const publishedExhibitions = exhibitions.filter((ex) => ex.judgeCommentsPublished);
+
+  async function handlePublishAll() {
+    setBulkPublishing(true);
+    try {
+      await Promise.all(
+        publishableRows.map(async (row) => {
+          const evs = byExhibition.get(row.exhibition.id) ?? [];
+          const comments = buildPublishableComments(evs);
+          await setExhibitionJudgeComments(row.exhibition.id, true, comments);
+          onExhibitionChange(row.exhibition.id, { judgeCommentsPublished: true, publishedJudgeComments: comments });
+        })
+      );
+    } finally {
+      setBulkPublishing(false);
+    }
+  }
+
+  async function handleUnpublishAll() {
+    setBulkPublishing(true);
+    try {
+      await Promise.all(
+        publishedExhibitions.map(async (ex) => {
+          await setExhibitionJudgeComments(ex.id, false, ex.publishedJudgeComments ?? null);
+          onExhibitionChange(ex.id, { judgeCommentsPublished: false });
+        })
+      );
+    } finally {
+      setBulkPublishing(false);
+    }
+  }
+
   return (
     <div className="mt-10 rounded-2xl border border-border bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -365,9 +406,29 @@ function AwardPanel({
           <h2 className="font-bold">수상작 지정 · 채점 집계</h2>
           <p className="mt-1 text-sm text-muted">심사위원 평균 점수 기준으로 정렬돼요. 관리자에게만 보여요.</p>
         </div>
-        <Button variant="outline" size="sm" loading={exporting} onClick={handleExport}>
-          <Download size={14} /> 심사 결과 엑셀
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            loading={bulkPublishing}
+            disabled={publishableRows.length === 0}
+            onClick={handlePublishAll}
+          >
+            <MessageSquare size={14} /> 심사평 전체 공개 ({publishableRows.length})
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={bulkPublishing}
+            disabled={publishedExhibitions.length === 0}
+            onClick={handleUnpublishAll}
+          >
+            <MessageSquare size={14} /> 심사평 전체 비공개 ({publishedExhibitions.length})
+          </Button>
+          <Button variant="outline" size="sm" loading={exporting} onClick={handleExport}>
+            <Download size={14} /> 심사 결과 엑셀
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4 overflow-x-auto">
@@ -460,7 +521,9 @@ function AwardPanel({
                           size="sm"
                           variant={row.exhibition.judgeCommentsPublished ? "primary" : "outline"}
                           loading={publishingId === row.exhibition.id}
-                          disabled={!row.exhibition.judgeCommentsPublished && (!allJudgesDone || !hasComments)}
+                          disabled={
+                            bulkPublishing || (!row.exhibition.judgeCommentsPublished && (!allJudgesDone || !hasComments))
+                          }
                           onClick={() => handleToggleComments(row.exhibition, evs)}
                         >
                           <MessageSquare size={14} />
