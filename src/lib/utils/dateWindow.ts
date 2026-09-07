@@ -13,6 +13,14 @@ export function getSubmissionWindowState(
   return "open";
 }
 
+// Formats a Date for a <input type="datetime-local"> value, in local time
+// (not UTC, unlike Date#toISOString) — used wherever an admin sets a public
+// reveal/countdown target (theme reveal, award announcement, ...).
+export function toLocalInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function formatDateRange(openAt: Timestamp, closeAt: Timestamp): string {
   const fmt = (d: Date) =>
     `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(

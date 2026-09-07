@@ -6,17 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { subscribeCategories, updateCategoryBannerImage, updateCategoryThemeReveal } from "@/lib/firestore/categories";
 import { subscribeBannerTheme, setBannerTheme, deleteBannerTheme } from "@/lib/firestore/bannerThemes";
 import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
-import { formatDateRange } from "@/lib/utils/dateWindow";
+import { formatDateRange, toLocalInputValue } from "@/lib/utils/dateWindow";
 import type { BannerTheme, Category } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
-
-function toLocalInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 export default function AdminBannersPage() {
   const { firebaseUser } = useAuth();

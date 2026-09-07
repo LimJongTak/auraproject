@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Trophy } from "lucide-react";
 import { getCategory } from "@/lib/firestore/categories";
+import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { getSubmissionWindowState, formatDateRange } from "@/lib/utils/dateWindow";
 import { useCountdownTimer } from "@/hooks/useCountdown";
-import type { Category } from "@/types/models";
+import type { Category, Exhibition } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
 import { RichText } from "@/components/ui/RichText";
@@ -102,6 +103,8 @@ export default function ContestDetailPage() {
         />
       )}
 
+      <AwardResultsSection category={category} />
+
       <div className="mt-10 flex flex-col gap-3 sm:flex-row">
         {windowState === "open" ? (
           <Link href={`/exhibitions/new?categoryId=${category.id}`} className="flex-1">
@@ -118,6 +121,101 @@ export default function ContestDetailPage() {
           </Button>
         </Link>
       </div>
+    </div>
+  );
+}
+
+interface AwardGroup {
+  label: string;
+  minRank: number;
+  items: Exhibition[];
+}
+
+// Public "결과 발표" block — only rendered once an admin has turned on a
+// countdown for this contest (Category.awardAnnounceAt). Winners are read
+// straight off Exhibition.award, which is already set well before the
+// reveal; before the target time this component only shows the countdown
+// and never fetches the list, so nothing leaks through it early.
+function AwardResultsSection({ category }: { category: Category }) {
+  const target = category.awardAnnounceAt?.toDate() ?? null;
+  const countdown = useCountdownTimer(target);
+  const revealed = !target || (countdown?.done ?? false);
+  const [winners, setWinners] = useState<Exhibition[] | null>(null);
+
+  useEffect(() => {
+    if (!revealed) {
+      setWinners(null);
+      return;
+    }
+    listPublishedExhibitions({ categoryId: category.id, max: 500 }).then((exs) =>
+      setWinners(exs.filter((e) => e.award))
+    );
+  }, [revealed, category.id]);
+
+  const groups = useMemo<AwardGroup[]>(() => {
+    if (!winners) return [];
+    const byLabel = new Map<string, Exhibition[]>();
+    for (const w of winners) {
+      const label = w.award!.label;
+      const list = byLabel.get(label) ?? [];
+      list.push(w);
+      byLabel.set(label, list);
+    }
+    return Array.from(byLabel.entries())
+      .map(([label, items]) => ({
+        label,
+        minRank: Math.min(...items.map((i) => i.award!.rank)),
+        items: [...items].sort((a, b) => a.award!.rank - b.award!.rank || a.title.localeCompare(b.title)),
+      }))
+      .sort((a, b) => a.minRank - b.minRank);
+  }, [winners]);
+
+  if (!target) return null;
+
+  return (
+    <div className="mt-10 rounded-2xl border border-border bg-surface p-6">
+      <div className="flex items-center gap-1.5">
+        <Trophy size={18} className="text-primary" />
+        <h2 className="text-lg font-extrabold">수상 결과</h2>
+      </div>
+
+      {!revealed ? (
+        countdown && (
+          <div className="mt-4">
+            <p className="text-sm text-muted">아래 시각에 수상 결과가 공개돼요.</p>
+            <p className="mt-2 text-2xl font-extrabold text-primary">
+              {countdown.days}일 {String(countdown.hours).padStart(2, "0")}:
+              {String(countdown.minutes).padStart(2, "0")}:{String(countdown.seconds).padStart(2, "0")}
+            </p>
+          </div>
+        )
+      ) : winners === null ? (
+        <p className="mt-4 text-sm text-muted">불러오는 중...</p>
+      ) : groups.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">아직 등록된 수상작이 없어요.</p>
+      ) : (
+        <div className="mt-5 flex flex-col gap-5">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <p className="flex items-center gap-1.5 text-sm font-bold text-amber-700">
+                <Trophy size={14} /> {group.label}
+              </p>
+              <ul className="mt-2 flex flex-col gap-2">
+                {group.items.map((item) => (
+                  <li key={item.id} className="rounded-xl bg-white p-3">
+                    <Link href={`/exhibitions/${item.id}`} className="font-semibold hover:text-primary">
+                      {item.title}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {category.teamSizeMax === 1 ? "신청자" : "팀"} · {item.teamName}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

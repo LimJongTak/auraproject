@@ -82,6 +82,15 @@ export interface Category {
   popularAwardCount: number;
   popularAwardCloseAt: Timestamp | null;
   popularAwardAssignedAt: Timestamp | null;
+  // Public on purpose, same shape as themeRevealAt: visitors need it to render
+  // a "발표까지" countdown. Gates judged-award visibility everywhere it's
+  // shown publicly (exhibition cards, detail page, mypage, the contest page's
+  // 수상 결과 section) — until this passes, Exhibition.award is redacted from
+  // those views even though it's already admin-set. This is a UI-level gate
+  // only, not a Firestore rule: the award field lives on the already-public
+  // exhibition doc. Null disables staged reveal — awards show immediately,
+  // same as before this field existed.
+  awardAnnounceAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

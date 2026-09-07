@@ -3,10 +3,22 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronUp, Download, ExternalLink, MessageSquare, PlayCircle } from "lucide-react";
+import { Timestamp } from "firebase/firestore";
+import {
+  ArrowRight,
+  Bell,
+  BellOff,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
+  MessageSquare,
+  PlayCircle,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCountdownTimer } from "@/hooks/useCountdown";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
-import { getCategory } from "@/lib/firestore/categories";
+import { getCategory, updateCategoryAwardAnnounce } from "@/lib/firestore/categories";
 import { listPublishedExhibitions, setExhibitionAward, setExhibitionJudgeComments } from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { getAssignment, listAssignmentsForCategory } from "@/lib/firestore/judgeAssignments";
@@ -18,6 +30,7 @@ import { buildJudgingResultsWorkbook } from "@/lib/admin/judgingResultsExcel";
 import type { Category, Evaluation, Exhibition, JudgeAssignment } from "@/types/models";
 import { Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
+import { toLocalInputValue } from "@/lib/utils/dateWindow";
 import { cn } from "@/lib/utils/cn";
 
 const AWARD_PRESETS = ["대상", "최우수상", "우수상", "1등", "2등", "3등"];
@@ -231,6 +244,7 @@ function JudgeCategoryDetail() {
           onExhibitionChange={(id, patch) =>
             setExhibitions((prev) => prev && prev.map((ex) => (ex.id === id ? { ...ex, ...patch } : ex)))
           }
+          onCategoryChange={(patch) => setCategory((prev) => prev && { ...prev, ...patch })}
         />
       )}
     </div>
@@ -253,18 +267,106 @@ function buildPublishableComments(evs: Evaluation[]) {
     .map((e, i) => ({ label: `심사위원 ${i + 1}`, comment: e.comment!.trim() }));
 }
 
+// Sets the public countdown target for judged-award reveal (대상/최우수상/...).
+// Before it passes, Exhibition.award stays hidden from every public view
+// (see redactUnannouncedAwards) even though it's already assigned below — so
+// an admin can finish assigning prizes well ahead of the actual announcement.
+function AwardAnnouncePanel({
+  category,
+  onCategoryChange,
+}: {
+  category: Category;
+  onCategoryChange: (patch: Partial<Category>) => void;
+}) {
+  const [enabled, setEnabled] = useState(!!category.awardAnnounceAt);
+  const [value, setValue] = useState(() =>
+    toLocalInputValue(category.awardAnnounceAt?.toDate() ?? new Date(Date.now() + 3600_000))
+  );
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const announceCountdown = useCountdownTimer(category.awardAnnounceAt?.toDate() ?? null);
+  const announced = !!category.awardAnnounceAt && (announceCountdown?.done ?? false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const date = new Date(value);
+      await updateCategoryAwardAnnounce(category.id, date);
+      onCategoryChange({ awardAnnounceAt: Timestamp.fromDate(date) });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDisable() {
+    if (!confirm("수상 결과 발표 카운트다운을 끌까요? 수상 배지가 다시 즉시 공개돼요.")) return;
+    await updateCategoryAwardAnnounce(category.id, null);
+    onCategoryChange({ awardAnnounceAt: null });
+    setEnabled(false);
+  }
+
+  return (
+    <div className="rounded-xl bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {enabled ? <Bell size={16} className="text-primary" /> : <BellOff size={16} className="text-muted" />}
+          <div>
+            <p className="text-sm font-bold">수상 결과 발표 카운트다운</p>
+            <p className="text-xs text-muted">
+              {enabled
+                ? announced
+                  ? "발표 완료 — 수상 배지와 대회 페이지 결과가 공개됐어요."
+                  : "발표 전까지 수상 배지와 대회 페이지 결과가 모두 숨겨져요."
+                : "꺼져 있으면 수상작 지정 즉시 배지가 공개돼요."}
+            </p>
+          </div>
+        </div>
+        {enabled && (
+          <Button type="button" variant="outline" size="sm" onClick={handleDisable}>
+            끄기
+          </Button>
+        )}
+      </div>
+
+      {enabled ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="datetime-local"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="rounded-lg border border-border px-2 py-1.5 text-sm outline-none focus:border-primary"
+          />
+          <Button type="button" size="sm" loading={saving} onClick={handleSave}>
+            저장
+          </Button>
+          {saved && <span className="text-xs font-semibold text-primary">저장됐어요</span>}
+        </div>
+      ) : (
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setEnabled(true)}>
+          <Bell size={14} /> 발표 카운트다운 켜기
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function AwardPanel({
   category,
   exhibitions,
   evaluations,
   assignments,
   onExhibitionChange,
+  onCategoryChange,
 }: {
   category: Category;
   exhibitions: Exhibition[];
   evaluations: Evaluation[];
   assignments: JudgeAssignment[];
   onExhibitionChange: (id: string, patch: Partial<Exhibition>) => void;
+  onCategoryChange: (patch: Partial<Category>) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, AwardDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -401,7 +503,9 @@ function AwardPanel({
 
   return (
     <div className="mt-10 rounded-2xl border border-border bg-white p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <AwardAnnouncePanel category={category} onCategoryChange={onCategoryChange} />
+
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-bold">수상작 지정 · 채점 집계</h2>
           <p className="mt-1 text-sm text-muted">심사위원 평균 점수 기준으로 정렬돼요. 관리자에게만 보여요.</p>

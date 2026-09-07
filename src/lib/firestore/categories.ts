@@ -67,6 +67,7 @@ export async function createCategory(input: CategoryInput) {
     popularAwardCloseAt: input.popularAwardCloseAt ? Timestamp.fromDate(input.popularAwardCloseAt) : null,
     popularAwardAssignedAt: null,
     themeRevealAt: null,
+    awardAnnounceAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -108,6 +109,13 @@ export async function updateCategoryBannerImage(id: string, bannerImageUrl: stri
 export async function updateCategoryThemeReveal(id: string, revealAt: Date | null) {
   await updateDoc(doc(db, "categories", id), {
     themeRevealAt: revealAt ? Timestamp.fromDate(revealAt) : null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateCategoryAwardAnnounce(id: string, announceAt: Date | null) {
+  await updateDoc(doc(db, "categories", id), {
+    awardAnnounceAt: announceAt ? Timestamp.fromDate(announceAt) : null,
     updatedAt: serverTimestamp(),
   });
 }

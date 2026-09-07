@@ -8,7 +8,8 @@ import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
 import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
 import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
-import type { Exhibition } from "@/types/models";
+import { isAwardAnnounced } from "@/lib/utils/awardReveal";
+import type { Category, Exhibition } from "@/types/models";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge, Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { LinkPreviewCard, LinkPreviewFallback } from "@/components/link-preview/LinkPreviewCard";
@@ -32,10 +33,18 @@ export function ExhibitionDetailClient() {
   const [canEdit, setCanEdit] = useState(false);
   const [submissionClosed, setSubmissionClosed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Fetched independent of profile (unlike the canEdit/submissionClosed one
+  // below) so logged-out visitors also get the award-reveal gate.
+  const [category, setCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     getExhibition(params.id).then(setExhibition);
   }, [params.id]);
+
+  useEffect(() => {
+    if (!exhibition) return;
+    getCategory(exhibition.categoryId).then(setCategory);
+  }, [exhibition]);
 
   useEffect(() => {
     if (!profile || !exhibition) {
@@ -89,7 +98,7 @@ export function ExhibitionDetailClient() {
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Badge>{exhibition.categoryName}</Badge>
-          {exhibition.award && (
+          {exhibition.award && isAwardAnnounced(category) && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
               <Trophy size={12} /> {exhibition.award.label}
             </span>

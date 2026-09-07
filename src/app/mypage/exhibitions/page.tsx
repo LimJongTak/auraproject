@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Heart, LayoutGrid, MessageCircle, Plus, Trash2, Trophy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteExhibition, listTeamExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeMyMemberships } from "@/lib/firestore/teams";
-import type { Exhibition, ExhibitionStatus, TeamMembership } from "@/types/models";
+import { subscribeCategories } from "@/lib/firestore/categories";
+import { redactUnannouncedAwards } from "@/lib/utils/awardReveal";
+import type { Category, Exhibition, ExhibitionStatus, TeamMembership } from "@/types/models";
 import { Badge, CenteredSpinner } from "@/components/ui/misc";
 
 const STATUS_LABEL: Record<ExhibitionStatus, string> = {
@@ -20,12 +22,24 @@ export default function MyExhibitionsPage() {
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
   const [exhibitions, setExhibitions] = useState<Exhibition[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     if (!profile?.uid) return;
     const unsub = subscribeMyMemberships(profile.uid, setMemberships);
     return () => unsub();
   }, [profile?.uid]);
+
+  useEffect(() => {
+    const unsub = subscribeCategories(setCategories);
+    return () => unsub();
+  }, []);
+
+  const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const visibleExhibitions = useMemo(
+    () => (exhibitions ? redactUnannouncedAwards(exhibitions, categoriesById) : null),
+    [exhibitions, categoriesById]
+  );
 
   function refresh() {
     if (!memberships) return;
@@ -71,13 +85,13 @@ export default function MyExhibitionsPage() {
             <Plus size={14} /> 등록
           </Link>
         </div>
-        {exhibitions === null ? (
+        {visibleExhibitions === null ? (
           <p className="mt-3 text-sm text-muted">불러오는 중...</p>
-        ) : exhibitions.length === 0 ? (
+        ) : visibleExhibitions.length === 0 ? (
           <p className="mt-3 text-sm text-muted">아직 등록한 전시물이 없어요.</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
-            {exhibitions.map((e) => (
+            {visibleExhibitions.map((e) => (
               <li key={e.id} className="rounded-xl bg-surface px-4 py-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   {e.status === "draft" ? (

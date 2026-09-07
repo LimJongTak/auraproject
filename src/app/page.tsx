@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Users, Layers, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeMyMemberships } from "@/lib/firestore/teams";
-import type { Exhibition, TeamMembership } from "@/types/models";
+import { subscribeCategories } from "@/lib/firestore/categories";
+import { redactUnannouncedAwards } from "@/lib/utils/awardReveal";
+import type { Category, Exhibition, TeamMembership } from "@/types/models";
 import { ContestBanners } from "@/components/home/ContestBanners";
 import { PopularExhibitions } from "@/components/home/PopularExhibitions";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
@@ -22,6 +24,7 @@ export default function HomePage() {
   const [recent, setRecent] = useState<Exhibition[] | null>(null);
   const [popular, setPopular] = useState<Exhibition[]>([]);
   const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     listPublishedExhibitions({ sort: "latest", max: 18 }).then(setRecent);
@@ -35,6 +38,17 @@ export default function HomePage() {
     const unsub = subscribeMyMemberships(profile.uid, setMemberships);
     return () => unsub();
   }, [profile?.uid]);
+
+  useEffect(() => {
+    const unsub = subscribeCategories(setCategories);
+    return () => unsub();
+  }, []);
+
+  const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const visibleRecent = useMemo(
+    () => (recent ? redactUnannouncedAwards(recent, categoriesById) : null),
+    [recent, categoriesById]
+  );
 
   return (
     <div>
@@ -107,22 +121,22 @@ export default function HomePage() {
             전체보기
           </Link>
         </div>
-        {recent === null ? (
+        {visibleRecent === null ? (
           <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <ExhibitionCardSkeleton key={i} />
             ))}
           </div>
-        ) : recent.length > MARQUEE_THRESHOLD ? (
-          <ExhibitionMarquee exhibitions={recent} />
+        ) : visibleRecent.length > MARQUEE_THRESHOLD ? (
+          <ExhibitionMarquee exhibitions={visibleRecent} />
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {recent.map((e) => (
+            {visibleRecent.map((e) => (
               <ExhibitionCard key={e.id} exhibition={e} />
             ))}
           </div>
         )}
-        {recent && recent.length === 0 && (
+        {visibleRecent && visibleRecent.length === 0 && (
           <p className="mt-6 text-center text-sm text-muted">아직 등록된 전시물이 없어요.</p>
         )}
       </section>

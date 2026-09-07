@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trophy } from "lucide-react";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { subscribeCategories } from "@/lib/firestore/categories";
+import { redactUnannouncedAwards } from "@/lib/utils/awardReveal";
 import type { Category, Exhibition, ExhibitionSearchType, SortOption } from "@/types/models";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
 import { ExhibitionSearchBar } from "@/components/exhibitions/ExhibitionSearchBar";
@@ -89,7 +90,16 @@ function ExhibitionsPageInner() {
     router.replace(qs ? `/exhibitions?${qs}` : "/exhibitions", { scroll: false });
   }
 
-  const hasAwards = useMemo(() => exhibitions.some((e) => e.award || e.popularAwardRank), [exhibitions]);
+  const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const visibleExhibitions = useMemo(
+    () => redactUnannouncedAwards(exhibitions, categoriesById),
+    [exhibitions, categoriesById]
+  );
+
+  const hasAwards = useMemo(
+    () => visibleExhibitions.some((e) => e.award || e.popularAwardRank),
+    [visibleExhibitions]
+  );
 
   useEffect(() => {
     if (!hasAwards) setAwardOnly(false);
@@ -97,10 +107,10 @@ function ExhibitionsPageInner() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return exhibitions
+    return visibleExhibitions
       .filter((e) => matchesSearch(e, searchType, term))
       .filter((e) => !awardOnly || e.award || e.popularAwardRank);
-  }, [exhibitions, search, searchType, awardOnly]);
+  }, [visibleExhibitions, search, searchType, awardOnly]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
