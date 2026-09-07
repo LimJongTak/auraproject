@@ -45,6 +45,16 @@ export interface TeamMembership {
 export const CONTEST_TYPES = ["바이브코딩", "경진대회", "해커톤", "아이디어톤", "공모전"] as const;
 export type ContestType = (typeof CONTEST_TYPES)[number];
 
+// Reorderable blocks on the home page — see lib/firestore/homeLayout.ts.
+// Admin-controlled section order, stored as siteSettings/homeLayout.
+export const HOME_SECTION_KEYS = ["banners", "popular", "awards", "recent"] as const;
+export type HomeSectionKey = (typeof HOME_SECTION_KEYS)[number];
+
+export interface HomeLayoutConfig {
+  sectionOrder: HomeSectionKey[];
+  updatedAt: Timestamp;
+}
+
 export interface Category {
   id: string;
   name: string;

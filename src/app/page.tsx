@@ -1,30 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
-import { subscribeMyMemberships } from "@/lib/firestore/teams";
 import { subscribeCategories } from "@/lib/firestore/categories";
+import { subscribeHomeLayout } from "@/lib/firestore/homeLayout";
 import { redactUnannouncedAwards } from "@/lib/utils/awardReveal";
-import type { Category, Exhibition, TeamMembership } from "@/types/models";
+import { HOME_SECTION_KEYS, type Category, type Exhibition, type HomeSectionKey } from "@/types/models";
 import { ContestBanners } from "@/components/home/ContestBanners";
 import { PopularExhibitions } from "@/components/home/PopularExhibitions";
 import { CategoryAwardResults } from "@/components/contest/AwardResults";
 import { ExhibitionCard, ExhibitionCardSkeleton } from "@/components/exhibitions/ExhibitionCard";
 import { ExhibitionMarquee } from "@/components/exhibitions/ExhibitionMarquee";
-import { Button } from "@/components/ui/Button";
 
 // Below this count a static grid reads better; above it, a static grid would
 // just clip items, so we switch to the auto-scrolling marquee instead.
 const MARQUEE_THRESHOLD = 6;
 
 export default function HomePage() {
-  const { firebaseUser, profile } = useAuth();
   const [recent, setRecent] = useState<Exhibition[] | null>(null);
   const [popular, setPopular] = useState<Exhibition[]>([]);
-  const [memberships, setMemberships] = useState<TeamMembership[] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  // Admin-controlled — see /admin/banners's "메인 화면 섹션 순서" panel and
+  // lib/firestore/homeLayout.ts. Defaults to this order until that doc loads
+  // (or if it was never set), so the page never renders empty on first paint.
+  const [sectionOrder, setSectionOrder] = useState<HomeSectionKey[]>([...HOME_SECTION_KEYS]);
 
   useEffect(() => {
     listPublishedExhibitions({ sort: "latest", max: 18 }).then(setRecent);
@@ -34,13 +35,12 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!profile?.uid) return;
-    const unsub = subscribeMyMemberships(profile.uid, setMemberships);
+    const unsub = subscribeCategories(setCategories);
     return () => unsub();
-  }, [profile?.uid]);
+  }, []);
 
   useEffect(() => {
-    const unsub = subscribeCategories(setCategories);
+    const unsub = subscribeHomeLayout(setSectionOrder);
     return () => unsub();
   }, []);
 
@@ -56,52 +56,21 @@ export default function HomePage() {
   // so ordinary awardless contests never trigger the section's own fetch.
   const awardCandidates = categories.filter((c) => !!c.awardAnnounceAt || !!c.popularAwardAssignedAt);
 
-  return (
-    <div>
-      <ContestBanners />
-
-      <PopularExhibitions exhibitions={popular} />
-
-      {awardCandidates.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pt-14">
-          <h2 className="text-xl font-extrabold">수상 결과</h2>
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+  const sections: Record<HomeSectionKey, ReactNode> = {
+    banners: <ContestBanners key="banners" />,
+    popular: <PopularExhibitions key="popular" exhibitions={popular} />,
+    awards:
+      awardCandidates.length > 0 ? (
+        <section key="awards" className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {awardCandidates.map((c) => (
               <CategoryAwardResults key={c.id} category={c} showHeading />
             ))}
           </div>
         </section>
-      )}
-
-      {(!firebaseUser || (profile && memberships && memberships.length === 0)) && (
-        <section className="mx-auto max-w-6xl px-4 py-14">
-          {!firebaseUser && (
-            <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-6 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-              <div>
-                <p className="font-bold">아직 회원이 아니신가요?</p>
-                <p className="text-sm text-muted">이름, 학교, 학번 정보로 간편하게 가입할 수 있어요.</p>
-              </div>
-              <Link href="/signup">
-                <Button>회원가입하기</Button>
-              </Link>
-            </div>
-          )}
-
-          {profile && memberships && memberships.length === 0 && (
-            <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-6 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-              <div>
-                <p className="font-bold">아직 팀이 없으신가요?</p>
-                <p className="text-sm text-muted">전시물을 등록하려면 먼저 팀을 구성해야 해요.</p>
-              </div>
-              <Link href="/team">
-                <Button>팀 구성하기</Button>
-              </Link>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="mx-auto max-w-6xl px-4 pb-20">
+      ) : null,
+    recent: (
+      <section key="recent" className="mx-auto max-w-6xl px-4 py-14">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-extrabold">최근 전시물</h2>
           <Link href="/exhibitions" className="text-sm font-semibold text-primary">
@@ -127,6 +96,8 @@ export default function HomePage() {
           <p className="mt-6 text-center text-sm text-muted">아직 등록된 전시물이 없어요.</p>
         )}
       </section>
-    </div>
-  );
+    ),
+  };
+
+  return <div>{sectionOrder.map((key) => sections[key])}</div>;
 }

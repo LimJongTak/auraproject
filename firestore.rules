@@ -106,6 +106,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------------- site-wide settings (single doc per key, e.g. 'homeLayout') ----------------
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ---------------- judge assignments (doc ID == `${uid}_${categoryId}`) ----------------
     // Scopes a 'judge'-role account to specific contests — see
     // isAssignedJudge() above and evaluations below. Admin-managed only:

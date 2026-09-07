@@ -17,7 +17,7 @@ export function ContestBanners() {
   if (banners.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pt-10">
+    <section className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex flex-col gap-6">
         {banners.map((c) => (
           <ContestBanner key={c.id} category={c} />

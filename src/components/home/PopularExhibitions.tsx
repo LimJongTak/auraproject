@@ -79,7 +79,7 @@ export function PopularExhibitions({ exhibitions }: { exhibitions: Exhibition[] 
   if (exhibitions.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-4 pt-14">
+    <section className="mx-auto max-w-6xl px-4 py-14">
       <div className="flex items-center gap-2">
         <Flame size={20} className="text-primary" />
         <h2 className="text-xl font-extrabold">지금 인기 있는 전시물</h2>

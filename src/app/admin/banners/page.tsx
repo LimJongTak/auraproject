@@ -2,16 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeCategories, updateCategoryBannerImage, updateCategoryThemeReveal } from "@/lib/firestore/categories";
 import { subscribeBannerTheme, setBannerTheme, deleteBannerTheme } from "@/lib/firestore/bannerThemes";
+import { subscribeHomeLayout, setHomeLayout } from "@/lib/firestore/homeLayout";
 import { uploadThemeImage } from "@/lib/storage/uploadThemeImage";
 import { formatDateRange, toLocalInputValue } from "@/lib/utils/dateWindow";
-import type { BannerTheme, Category } from "@/types/models";
+import type { BannerTheme, Category, HomeSectionKey } from "@/types/models";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { ErrorText } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
+
+const SECTION_LABEL: Record<HomeSectionKey, { title: string; hint: string }> = {
+  banners: { title: "대회 배너", hint: "아래에서 배너를 등록한 대회만 노출돼요" },
+  popular: { title: "지금 인기있는 전시물", hint: "좋아요를 받은 전시물이 있을 때만 노출돼요" },
+  awards: { title: "수상 결과", hint: "발표 카운트다운이나 인기상이 있는 대회가 있을 때만 노출돼요" },
+  recent: { title: "최근 전시물", hint: "항상 노출돼요" },
+};
 
 export default function AdminBannersPage() {
   const { firebaseUser } = useAuth();
@@ -29,6 +38,8 @@ export default function AdminBannersPage() {
         description="배너 이미지를 등록한 대회만 메인 화면 상단에 노출돼요. 신청 시작 카운트다운은 카테고리 관리에서 설정한 게시 시작 시각을 그대로 사용해요."
       />
 
+      <HomeLayoutPanel />
+
       {categories === null && <p className="mt-8 text-sm text-muted">불러오는 중...</p>}
       {categories !== null && categories.length === 0 && (
         <p className="mt-8 text-sm text-muted">
@@ -45,6 +56,83 @@ export default function AdminBannersPage() {
           <BannerCard key={c.id} category={c} uid={firebaseUser?.uid ?? ""} />
         ))}
       </div>
+    </div>
+  );
+}
+
+// Reorders the home page's top-level sections (대회 배너/인기 전시물/수상
+// 결과/최근 전시물). Same up/down-arrow reorder UX as 퀵메뉴 관리, applied to
+// siteSettings/homeLayout instead of a list of documents — each move here
+// writes the whole array back, since there's only ever one doc to update.
+function HomeLayoutPanel() {
+  const [order, setOrder] = useState<HomeSectionKey[] | null>(null);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeHomeLayout(setOrder);
+    return () => unsub();
+  }, []);
+
+  async function handleMove(index: number, direction: -1 | 1) {
+    if (!order) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= order.length) return;
+    const next = [...order];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    setSavingIndex(index);
+    try {
+      await setHomeLayout(next);
+    } finally {
+      setSavingIndex(null);
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-white p-5">
+      <p className="font-bold">메인 화면 섹션 순서</p>
+      <p className="mt-0.5 text-xs text-muted">
+        홈 화면에 노출되는 섹션들의 순서예요. 화살표로 위아래 순서를 바꿀 수 있어요.
+      </p>
+
+      {order === null ? (
+        <p className="mt-4 text-sm text-muted">불러오는 중...</p>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-2">
+          {order.map((key, i) => (
+            <li
+              key={key}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3"
+            >
+              <div>
+                <p className="text-sm font-semibold">
+                  {i + 1}. {SECTION_LABEL[key].title}
+                </p>
+                <p className="text-xs text-muted">{SECTION_LABEL[key].hint}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleMove(i, -1)}
+                  disabled={i === 0 || savingIndex !== null}
+                  className="rounded-lg p-1.5 text-muted transition hover:bg-white hover:text-foreground disabled:opacity-30"
+                  aria-label="위로 이동"
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMove(i, 1)}
+                  disabled={i === order.length - 1 || savingIndex !== null}
+                  className="rounded-lg p-1.5 text-muted transition hover:bg-white hover:text-foreground disabled:opacity-30"
+                  aria-label="아래로 이동"
+                >
+                  <ArrowDown size={16} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
