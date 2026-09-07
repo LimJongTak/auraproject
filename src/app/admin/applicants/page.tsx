@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Archive, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { subscribeCategories } from "@/lib/firestore/categories";
 import { listAllExhibitionsForAdmin } from "@/lib/firestore/exhibitions";
 import { listAllTeamsForAdmin } from "@/lib/firestore/teams";
 import { listAllUsers } from "@/lib/firestore/users";
 import type { Category, Exhibition, MemberType, Team, UserProfile } from "@/types/models";
-import { toCsv, downloadCsv } from "@/lib/utils/csv";
 import { buildContestZip, type ExportProgress } from "@/lib/admin/exportContestZip";
 import { CenteredSpinner } from "@/components/ui/misc";
 import { AdminPageHeader } from "@/components/admin/PageHeader";
@@ -20,6 +20,7 @@ interface Applicant {
   department: string;
   grade: string;
   studentId: string;
+  phone: string;
   teamName: string;
 }
 
@@ -84,6 +85,7 @@ export default function AdminApplicantsPage() {
           department: u.department || "-",
           grade: u.grade || "-",
           studentId: u.studentId || "-",
+          phone: u.phone || "-",
           teamName: team.name,
         });
       }
@@ -92,18 +94,20 @@ export default function AdminApplicantsPage() {
   }
 
   function handleDownload(category: Category, applicants: Applicant[]) {
-    const csv = toCsv(
-      ["이름", "구분", "학과/소속", "학년", "학번/사번", "팀명"],
-      applicants.map((a) => [
-        a.name,
-        a.memberType === "staff" ? "교직원" : "학생",
-        a.department,
-        a.grade,
-        a.studentId,
-        a.teamName,
-      ])
-    );
-    downloadCsv(`${category.name}_신청자명단.csv`, csv);
+    const rows = applicants.map((a) => ({
+      이름: a.name,
+      구분: a.memberType === "staff" ? "교직원" : "학생",
+      "학과/소속": a.department,
+      학년: a.grade,
+      "학번/사번": a.studentId,
+      전화번호: a.phone,
+      팀명: a.teamName,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 10 }, { wch: 8 }, { wch: 18 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "신청자명단");
+    XLSX.writeFile(wb, `${category.name}_신청자명단.xlsx`);
   }
 
   async function handleDownloadZip(category: Category) {
@@ -131,7 +135,7 @@ export default function AdminApplicantsPage() {
     <div>
       <AdminPageHeader
         title="신청자 관리"
-        description="대회(카테고리)별로 게시까지 완료한 학생 명단을 확인하고 CSV로 내려받을 수 있어요. 임시저장 상태인 전시물은 참여로 집계되지 않아요."
+        description="대회(카테고리)별로 게시까지 완료한 학생 명단을 확인하고 엑셀로 내려받을 수 있어요. 임시저장 상태인 전시물은 참여로 집계되지 않아요."
       />
 
       <div className="flex flex-col gap-6">
@@ -154,7 +158,7 @@ export default function AdminApplicantsPage() {
                     onClick={() => handleDownload(c, applicants)}
                     disabled={applicants.length === 0}
                   >
-                    <Download size={14} /> CSV 다운로드
+                    <Download size={14} /> 엑셀 다운로드
                   </Button>
                   <Button
                     variant="outline"
@@ -186,6 +190,7 @@ export default function AdminApplicantsPage() {
                         <th className="py-2 pr-4 font-semibold">학과/소속</th>
                         <th className="py-2 pr-4 font-semibold">학년</th>
                         <th className="py-2 pr-4 font-semibold">학번/사번</th>
+                        <th className="py-2 pr-4 font-semibold">전화번호</th>
                         <th className="py-2 pr-4 font-semibold">팀명</th>
                       </tr>
                     </thead>
@@ -197,6 +202,7 @@ export default function AdminApplicantsPage() {
                           <td className="py-2 pr-4">{a.department}</td>
                           <td className="py-2 pr-4">{a.grade}</td>
                           <td className="py-2 pr-4">{a.studentId}</td>
+                          <td className="py-2 pr-4">{a.phone}</td>
                           <td className="py-2 pr-4">{a.teamName}</td>
                         </tr>
                       ))}
