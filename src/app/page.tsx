@@ -62,9 +62,9 @@ export default function HomePage() {
     awards:
       awardCandidates.length > 0 ? (
         <section key="awards" className="mx-auto max-w-6xl px-4 py-14">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div className="flex flex-col divide-y divide-border">
             {awardCandidates.map((c) => (
-              <CategoryAwardResults key={c.id} category={c} showHeading />
+              <CategoryAwardResults key={c.id} category={c} showHeading className="py-8 first:pt-0 last:pb-0" />
             ))}
           </div>
         </section>

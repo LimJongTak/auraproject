@@ -108,15 +108,15 @@ export function CategoryAwardResults({
   if (!worthFetching || (!showCountdown && groups.length === 0)) return null;
 
   return (
-    <div className={cn("rounded-2xl border border-border bg-surface p-5 sm:p-6", className)}>
+    <div className={cn(!showHeading && "rounded-2xl border border-border bg-surface p-5 sm:p-6", className)}>
       {showHeading && (
-        <Link href={`/contest/${category.id}`} className="text-xs font-bold text-primary hover:underline">
+        <Link href={`/contest/${category.id}`} className="text-sm font-bold text-primary hover:underline">
           {category.name}
         </Link>
       )}
       <div className={cn("flex items-center gap-1.5", showHeading && "mt-1")}>
-        <Trophy size={showHeading ? 16 : 18} className="text-primary" />
-        <h3 className={cn("font-extrabold", showHeading ? "text-base" : "text-lg")}>수상 결과</h3>
+        <Trophy size={showHeading ? 20 : 18} className="text-primary" />
+        <h3 className={cn("font-extrabold", showHeading ? "text-xl" : "text-lg")}>수상 결과</h3>
       </div>
 
       {showCountdown && countdown && (
@@ -129,25 +129,25 @@ export function CategoryAwardResults({
       )}
 
       {groups.length > 0 && (
-        <div className={cn("flex flex-col gap-4", showCountdown && "mt-5")}>
+        <div className={cn("flex flex-col flex-wrap gap-6 sm:flex-row", showCountdown && "mt-5")}>
           {groups.map((group) => (
-            <div key={group.key}>
-              <p
+            <div key={group.key} className="sm:min-w-[200px] sm:flex-1">
+              <span
                 className={cn(
-                  "flex items-center gap-1.5 text-sm font-bold",
-                  group.variant === "popular" ? "text-rose-600" : "text-amber-700"
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold",
+                  group.variant === "popular" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"
                 )}
               >
-                {group.variant === "popular" ? <Heart size={13} /> : <Trophy size={13} />} {group.label}
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+                {group.variant === "popular" ? <Heart size={12} /> : <Trophy size={12} />} {group.label}
+              </span>
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 {group.items.map((item) => (
                   <Link
                     key={item.id}
                     href={`/exhibitions/${item.id}`}
-                    className="group flex flex-col gap-1.5 rounded-xl bg-white p-2"
+                    className="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-border transition hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-surface">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface">
                       {item.thumbnailUrl ? (
                         <Image
                           src={item.thumbnailUrl}
@@ -162,10 +162,14 @@ export function CategoryAwardResults({
                         </div>
                       )}
                     </div>
-                    <p className="line-clamp-1 text-sm font-semibold group-hover:text-primary">{item.title}</p>
-                    <p className="line-clamp-1 text-xs text-muted">
-                      {category.teamSizeMax === 1 ? item.teamName : `팀 · ${item.teamName}`}
-                    </p>
+                    <div className="flex flex-col gap-0.5 p-2.5">
+                      <p className="line-clamp-1 text-sm font-bold text-foreground transition group-hover:text-primary">
+                        {item.title}
+                      </p>
+                      <p className="line-clamp-1 text-xs text-muted">
+                        {category.teamSizeMax === 1 ? item.teamName : `팀 · ${item.teamName}`}
+                      </p>
+                    </div>
                   </Link>
                 ))}
               </div>
