@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Heart, Trophy } from "lucide-react";
 import { listPublishedExhibitions } from "@/lib/firestore/exhibitions";
 import { useCountdownTimer } from "@/hooks/useCountdown";
@@ -17,6 +18,14 @@ interface AwardGroup {
 }
 
 const POPULAR_LABEL = "인기상";
+
+// Judged award labels are free text entered per-exhibition by an admin (see
+// judge/[categoryId]/page.tsx's AWARD_PRESETS), so the numeric rank they type
+// alongside it isn't guaranteed to sort 대상/최우수상/우수상 in the expected
+// order. This gives the common labels a fixed display order; anything else
+// (custom labels) falls back to sorting by that admin-entered rank, and 인기상
+// is always last regardless.
+const JUDGED_LABEL_ORDER = ["대상", "최우수상", "우수상"];
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -75,7 +84,14 @@ export function CategoryAwardResults({
           items: [...items].sort((a, b) => a.award!.rank - b.award!.rank || a.title.localeCompare(b.title)),
           variant: "judged" as const,
         }))
-        .sort((a, b) => a.minRank - b.minRank);
+        .sort((a, b) => {
+          const orderA = JUDGED_LABEL_ORDER.indexOf(a.label);
+          const orderB = JUDGED_LABEL_ORDER.indexOf(b.label);
+          if (orderA !== -1 || orderB !== -1) {
+            return (orderA === -1 ? JUDGED_LABEL_ORDER.length : orderA) - (orderB === -1 ? JUDGED_LABEL_ORDER.length : orderB);
+          }
+          return a.minRank - b.minRank;
+        });
       result.push(...judgedGroups);
     }
 
@@ -124,18 +140,35 @@ export function CategoryAwardResults({
               >
                 {group.variant === "popular" ? <Heart size={13} /> : <Trophy size={13} />} {group.label}
               </p>
-              <ul className="mt-2 flex flex-col gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-3">
                 {group.items.map((item) => (
-                  <li key={item.id} className="rounded-xl bg-white p-3">
-                    <Link href={`/exhibitions/${item.id}`} className="font-semibold hover:text-primary">
-                      {item.title}
-                    </Link>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {category.teamSizeMax === 1 ? "신청자" : "팀"} · {item.teamName}
+                  <Link
+                    key={item.id}
+                    href={`/exhibitions/${item.id}`}
+                    className="group flex flex-col gap-1.5 rounded-xl bg-white p-2"
+                  >
+                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-surface">
+                      {item.thumbnailUrl ? (
+                        <Image
+                          src={item.thumbnailUrl}
+                          alt={item.title}
+                          fill
+                          sizes="(min-width: 1024px) 200px, 45vw"
+                          className="object-cover transition duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs text-muted">
+                          이미지 없음
+                        </div>
+                      )}
+                    </div>
+                    <p className="line-clamp-1 text-sm font-semibold group-hover:text-primary">{item.title}</p>
+                    <p className="line-clamp-1 text-xs text-muted">
+                      {category.teamSizeMax === 1 ? item.teamName : `팀 · ${item.teamName}`}
                     </p>
-                  </li>
+                  </Link>
                 ))}
-              </ul>
+              </div>
             </div>
           ))}
         </div>
