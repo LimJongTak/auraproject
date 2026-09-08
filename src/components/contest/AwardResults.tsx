@@ -105,6 +105,15 @@ export function CategoryAwardResults({
     return result;
   }, [exhibitions, judgedRevealed]);
 
+  // Only one group's items are shown at a time (behind the tab row below) so
+  // each card can be as large as the home page's 지금 인기 있는 전시물 cards
+  // instead of shrinking to fit every group on screen at once.
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  useEffect(() => {
+    setActiveKey((prev) => (prev && groups.some((g) => g.key === prev) ? prev : (groups[0]?.key ?? null)));
+  }, [groups]);
+  const activeGroup = groups.find((g) => g.key === activeKey) ?? null;
+
   if (!worthFetching || (!showCountdown && groups.length === 0)) return null;
 
   return (
@@ -129,52 +138,69 @@ export function CategoryAwardResults({
       )}
 
       {groups.length > 0 && (
-        <div className={cn("flex flex-col flex-wrap gap-6 sm:flex-row", showCountdown && "mt-5")}>
-          {groups.map((group) => (
-            <div key={group.key} className="sm:min-w-[200px] sm:flex-1">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold",
-                  group.variant === "popular" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"
-                )}
-              >
-                {group.variant === "popular" ? <Heart size={12} /> : <Trophy size={12} />} {group.label}
-              </span>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/exhibitions/${item.id}`}
-                    className="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-border transition hover:-translate-y-1 hover:shadow-lg"
-                  >
-                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface">
-                      {item.thumbnailUrl ? (
-                        <Image
-                          src={item.thumbnailUrl}
-                          alt={item.title}
-                          fill
-                          sizes="(min-width: 1024px) 200px, 45vw"
-                          className="object-cover transition duration-300 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xs text-muted">
-                          이미지 없음
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-0.5 p-2.5">
-                      <p className="line-clamp-1 text-sm font-bold text-foreground transition group-hover:text-primary">
-                        {item.title}
-                      </p>
-                      <p className="line-clamp-1 text-xs text-muted">
-                        {category.teamSizeMax === 1 ? item.teamName : `팀 · ${item.teamName}`}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+        <div className={cn(showCountdown && "mt-5")}>
+          <div className="flex flex-wrap gap-2">
+            {groups.map((group) => {
+              const isActive = activeGroup?.key === group.key;
+              return (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => setActiveKey(group.key)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-bold transition",
+                    isActive
+                      ? group.variant === "popular"
+                        ? "bg-rose-500 text-white"
+                        : "bg-amber-500 text-white"
+                      : group.variant === "popular"
+                        ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                        : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                  )}
+                >
+                  {group.variant === "popular" ? <Heart size={14} /> : <Trophy size={14} />}
+                  {group.label}
+                  <span className="text-xs font-normal opacity-80">{group.items.length}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeGroup && (
+            <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3">
+              {activeGroup.items.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/exhibitions/${item.id}`}
+                  className="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-border transition hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface">
+                    {item.thumbnailUrl ? (
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt={item.title}
+                        fill
+                        sizes="(min-width: 640px) 33vw, 90vw"
+                        className="object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm text-muted">
+                        이미지 없음
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1 p-4">
+                    <p className="line-clamp-1 text-xs font-semibold text-muted">
+                      {category.teamSizeMax === 1 ? item.teamName : `팀 · ${item.teamName}`}
+                    </p>
+                    <p className="line-clamp-1 font-bold text-foreground transition group-hover:text-primary">
+                      {item.title}
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
