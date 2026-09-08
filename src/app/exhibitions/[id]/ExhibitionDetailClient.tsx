@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Heart, MessageSquare, Pencil, Trash2, Trophy } from "lucide-react";
-import { deleteExhibition, getExhibition } from "@/lib/firestore/exhibitions";
+import { deleteExhibition, getExhibition, getExhibitionJudgeComments } from "@/lib/firestore/exhibitions";
 import { getCategory } from "@/lib/firestore/categories";
 import { getMembership } from "@/lib/firestore/teams";
 import { getSubmissionWindowState } from "@/lib/utils/dateWindow";
 import { isAwardAnnounced } from "@/lib/utils/awardReveal";
-import type { Category, Exhibition } from "@/types/models";
+import type { Category, Exhibition, ExhibitionJudgeComments } from "@/types/models";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge, Breadcrumb, CenteredSpinner, EmptyState } from "@/components/ui/misc";
 import { LinkPreviewCard, LinkPreviewFallback } from "@/components/link-preview/LinkPreviewCard";
@@ -36,6 +36,7 @@ export function ExhibitionDetailClient() {
   // Fetched independent of profile (unlike the canEdit/submissionClosed one
   // below) so logged-out visitors also get the award-reveal gate.
   const [category, setCategory] = useState<Category | null>(null);
+  const [judgeComments, setJudgeComments] = useState<ExhibitionJudgeComments | null>(null);
 
   useEffect(() => {
     getExhibition(params.id).then(setExhibition);
@@ -63,6 +64,19 @@ export function ExhibitionDetailClient() {
       setSubmissionClosed(!c || getSubmissionWindowState(c.submissionOpenAt, c.submissionCloseAt) === "closed");
     });
   }, [profile, exhibition]);
+
+  // 심사평 공개(judgeCommentsPublished) is admin-published, but the comment
+  // text itself only comes back from Firestore for the submitting team's own
+  // members and admins (see firestore.rules) — everyone else must never even
+  // attempt this read, so gate the call on canEdit rather than just hiding
+  // the result.
+  useEffect(() => {
+    if (!exhibition || !exhibition.judgeCommentsPublished || !canEdit) {
+      setJudgeComments(null);
+      return;
+    }
+    getExhibitionJudgeComments(exhibition.id).then(setJudgeComments);
+  }, [exhibition, canEdit]);
 
   if (exhibition === undefined) return <CenteredSpinner />;
   if (exhibition === null) {
@@ -166,13 +180,14 @@ export function ExhibitionDetailClient() {
         <ReferenceLinksRow links={exhibition.referenceLinks} />
       </div>
 
-      {exhibition.judgeCommentsPublished && exhibition.publishedJudgeComments && exhibition.publishedJudgeComments.length > 0 && (
+      {canEdit && judgeComments && judgeComments.comments.length > 0 && (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4">
           <div className="flex items-center gap-1.5 text-sm font-bold">
             <MessageSquare size={15} className="text-primary" /> 심사위원 코멘트
+            <span className="ml-1 text-xs font-normal text-muted">신청자만 볼 수 있어요</span>
           </div>
           <ul className="mt-3 flex flex-col gap-3">
-            {exhibition.publishedJudgeComments.map((c, i) => (
+            {judgeComments.comments.map((c, i) => (
               <li key={i} className="rounded-xl bg-white p-3">
                 <p className="text-xs font-semibold text-muted">{c.label}</p>
                 <p className="mt-1 text-sm text-foreground/90">{c.comment}</p>

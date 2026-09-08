@@ -9,12 +9,20 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Exhibition, ExhibitionStatus, LinkPreviewData, ReferenceLinks, SortOption } from "@/types/models";
+import type {
+  Exhibition,
+  ExhibitionJudgeComments,
+  ExhibitionStatus,
+  LinkPreviewData,
+  ReferenceLinks,
+  SortOption,
+} from "@/types/models";
 
 const exhibitionsRef = () => collection(db, "exhibitions");
 
@@ -55,7 +63,6 @@ export async function createDraftExhibition(input: NewExhibitionInput): Promise<
     award: null,
     popularAwardRank: null,
     judgeCommentsPublished: false,
-    publishedJudgeComments: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -119,19 +126,27 @@ export async function setExhibitionAward(
 
 // Publishes (or hides) judge comments for one exhibition — scores never
 // leave the evaluations collection, only free-text comments, and only ever
-// as an admin-taken snapshot (see Exhibition.publishedJudgeComments). Passing
-// published: false just hides the existing snapshot rather than clearing it,
-// so re-publishing later doesn't require recomputing anything that hasn't
-// changed.
+// as an admin-taken snapshot. The snapshot itself is written to the
+// exhibitions/{id}/judgeComments/public subcollection doc rather than the
+// exhibition doc (see ExhibitionJudgeComments), so firestore.rules can
+// restrict its read to the submitting team + admins. Passing published: false
+// just hides the existing snapshot rather than clearing it, so re-publishing
+// later doesn't require recomputing anything that hasn't changed.
 export async function setExhibitionJudgeComments(
   id: string,
   published: boolean,
   comments: { label: string; comment: string }[] | null
 ): Promise<void> {
-  await updateDoc(doc(db, "exhibitions", id), {
-    judgeCommentsPublished: published,
-    publishedJudgeComments: comments,
-  });
+  await updateDoc(doc(db, "exhibitions", id), { judgeCommentsPublished: published });
+  await setDoc(doc(db, "exhibitions", id, "judgeComments", "public"), { comments: comments ?? [] });
+}
+
+// Only readable by the submitting team's own members and admins (see
+// firestore.rules) — anyone else attempting this gets permission-denied, so
+// callers must gate the call itself on that eligibility, not just the result.
+export async function getExhibitionJudgeComments(id: string): Promise<ExhibitionJudgeComments | null> {
+  const snap = await getDoc(doc(db, "exhibitions", id, "judgeComments", "public"));
+  return snap.exists() ? (snap.data() as ExhibitionJudgeComments) : null;
 }
 
 export async function deleteExhibition(id: string): Promise<void> {

@@ -259,7 +259,7 @@ service cloud.firestore {
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['award']))
           || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['judgeCommentsPublished', 'publishedJudgeComments']))
+                .hasOnly(['judgeCommentsPublished']))
           // Admins can edit general fields (title, oneLiner, hashtags, referenceLinks,
           // etc.) on any exhibition, any time — unlike the team-member branch above,
           // this doesn't require team membership or an open submission window. It
@@ -284,6 +284,22 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if isSignedIn()
           && (resource.data.authorUid == request.auth.uid || isAdmin());
+      }
+
+      // Doc ID 'public' — the admin-published judge comment snapshot for this
+      // exhibition (see Exhibition.judgeCommentsPublished / models.ts's
+      // ExhibitionJudgeComments). Split out from the exhibition doc itself so
+      // this can stay restricted to the submitting team + admins even though
+      // the exhibition doc is otherwise fully public once status=='published'.
+      match /judgeComments/{docId} {
+        function parentExhibition() {
+          return get(/databases/$(database)/documents/exhibitions/$(exhibitionId)).data;
+        }
+        allow read: if isAdmin()
+          || (isSignedIn()
+              && parentExhibition().judgeCommentsPublished == true
+              && myMembershipTeamId(parentExhibition().categoryId) == parentExhibition().teamId);
+        allow write: if isAdmin();
       }
     }
 

@@ -166,13 +166,21 @@ export interface Exhibition {
   // Admin-controlled, per exhibition — never scores, only free-text judge
   // feedback, and only meant to be turned on once every assigned judge has
   // scored this exhibition (enforced in the admin UI, not in rules). See
-  // setExhibitionJudgeComments. publishedJudgeComments is a snapshot taken at
-  // the moment an admin publishes, with judges anonymized as "심사위원 N" —
-  // re-publishing overwrites it with the latest comments.
+  // setExhibitionJudgeComments. The comment snapshot itself lives in the
+  // exhibitions/{id}/judgeComments/public subcollection doc (not on this doc)
+  // so firestore.rules can restrict it to the submitting team + admins —
+  // this exhibition doc is otherwise fully public once status is 'published',
+  // and Firestore can't hide individual fields of an otherwise-readable doc.
   judgeCommentsPublished: boolean;
-  publishedJudgeComments: { label: string; comment: string }[] | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// Doc ID: 'public', at exhibitions/{exhibitionId}/judgeComments/public. Split
+// out from Exhibition so firestore.rules can gate its read to the submitting
+// team + admins instead of the whole public — see Exhibition.judgeCommentsPublished.
+export interface ExhibitionJudgeComments {
+  comments: { label: string; comment: string }[];
 }
 
 export interface ExhibitionLike {

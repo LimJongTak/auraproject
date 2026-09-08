@@ -19,7 +19,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCountdownTimer } from "@/hooks/useCountdown";
 import { RequireJudgeOrAdmin } from "@/components/auth/Guard";
 import { getCategory, updateCategoryAwardAnnounce } from "@/lib/firestore/categories";
-import { listPublishedExhibitions, setExhibitionAward, setExhibitionJudgeComments } from "@/lib/firestore/exhibitions";
+import {
+  getExhibitionJudgeComments,
+  listPublishedExhibitions,
+  setExhibitionAward,
+  setExhibitionJudgeComments,
+} from "@/lib/firestore/exhibitions";
 import { subscribeEvaluationsForCategory } from "@/lib/firestore/evaluations";
 import { getAssignment, listAssignmentsForCategory } from "@/lib/firestore/judgeAssignments";
 import { ScoreSheetExcelPanel } from "@/components/judge/ScoreSheetExcelPanel";
@@ -374,6 +379,26 @@ function AwardPanel({
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [openCommentsId, setOpenCommentsId] = useState<string | null>(null);
+  // The published comment snapshot lives in a subcollection doc (restricted
+  // to the submitting team + admins, see firestore.rules), not on Exhibition
+  // itself — fetched here separately since admins can read every one of them.
+  const [publishedComments, setPublishedComments] = useState<Record<string, { label: string; comment: string }[]>>(
+    {}
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const publishedIds = exhibitions.filter((ex) => ex.judgeCommentsPublished).map((ex) => ex.id);
+    if (publishedIds.length === 0) return;
+    Promise.all(publishedIds.map((id) => getExhibitionJudgeComments(id).then((c) => [id, c?.comments ?? []] as const)))
+      .then((entries) => {
+        if (cancelled) return;
+        setPublishedComments((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [exhibitions]);
 
   async function handleExport() {
     setExporting(true);
@@ -440,22 +465,20 @@ function AwardPanel({
   }
 
   // Toggling on takes a fresh snapshot of every judge's comment for this
-  // exhibition (score never included — see Exhibition.publishedJudgeComments)
-  // and anonymizes the judge as "심사위원 N" rather than showing their name.
+  // exhibition (score never included — see ExhibitionJudgeComments) and
+  // anonymizes the judge as "심사위원 N" rather than showing their name.
   // Toggling off just hides that snapshot instead of clearing it.
   async function handleToggleComments(exhibition: Exhibition, evs: Evaluation[]) {
     setPublishingId(exhibition.id);
     try {
       const nextPublished = !exhibition.judgeCommentsPublished;
-      const comments = nextPublished ? buildPublishableComments(evs) : exhibition.publishedJudgeComments ?? null;
+      const comments = nextPublished ? buildPublishableComments(evs) : publishedComments[exhibition.id] ?? null;
       await setExhibitionJudgeComments(exhibition.id, nextPublished, comments);
       // The exhibition list is a one-shot read (listPublishedExhibitions), not
       // a live subscription, so push the write back into it — otherwise the
       // button keeps rendering the pre-toggle state until a page reload.
-      onExhibitionChange(exhibition.id, {
-        judgeCommentsPublished: nextPublished,
-        publishedJudgeComments: comments,
-      });
+      onExhibitionChange(exhibition.id, { judgeCommentsPublished: nextPublished });
+      setPublishedComments((prev) => ({ ...prev, [exhibition.id]: comments ?? [] }));
     } finally {
       setPublishingId(null);
     }
@@ -479,7 +502,8 @@ function AwardPanel({
           const evs = byExhibition.get(row.exhibition.id) ?? [];
           const comments = buildPublishableComments(evs);
           await setExhibitionJudgeComments(row.exhibition.id, true, comments);
-          onExhibitionChange(row.exhibition.id, { judgeCommentsPublished: true, publishedJudgeComments: comments });
+          onExhibitionChange(row.exhibition.id, { judgeCommentsPublished: true });
+          setPublishedComments((prev) => ({ ...prev, [row.exhibition.id]: comments }));
         })
       );
     } finally {
@@ -492,7 +516,7 @@ function AwardPanel({
     try {
       await Promise.all(
         publishedExhibitions.map(async (ex) => {
-          await setExhibitionJudgeComments(ex.id, false, ex.publishedJudgeComments ?? null);
+          await setExhibitionJudgeComments(ex.id, false, publishedComments[ex.id] ?? null);
           onExhibitionChange(ex.id, { judgeCommentsPublished: false });
         })
       );
@@ -560,7 +584,7 @@ function AwardPanel({
               const snapshotStale =
                 row.exhibition.judgeCommentsPublished &&
                 JSON.stringify(buildPublishableComments(evs)) !==
-                  JSON.stringify(row.exhibition.publishedJudgeComments ?? []);
+                  JSON.stringify(publishedComments[row.exhibition.id] ?? []);
               return (
                 <Fragment key={row.exhibition.id}>
                   <tr className="border-b border-border last:border-0 align-top">
